@@ -1,5 +1,6 @@
 require "json"
 require "bundler/sbom/generator"
+require "bundler/sbom/reporter"
 
 module Bundler
   module Sbom
@@ -20,7 +21,7 @@ module Bundler
 
         begin
           sbom = JSON.parse(File.read("bom.json"))
-          Bundler::Sbom::Generator.display_license_report(sbom)
+          Bundler::Sbom::Reporter.display_license_report(sbom)
         rescue JSON::ParserError
           Bundler.ui.error("Error: bom.json is not a valid JSON file")
           exit 1
