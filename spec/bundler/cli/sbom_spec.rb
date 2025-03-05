@@ -1,8 +1,8 @@
 require "spec_helper"
-require "bundler/cli/sbom"
+require "bundler/sbom/cli"
 require "json"
 
-RSpec.describe Bundler::CLI::Sbom do
+RSpec.describe Bundler::Sbom::CLI do
   let(:cli) { described_class.new }
   
   around(:each) do |example|

@@ -1,21 +1,30 @@
 lib = File.expand_path("../lib", __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
+require_relative "lib/bundler/sbom"
+
 Gem::Specification.new do |spec|
   spec.name          = "bundler-sbom"
-  spec.version       = "0.1.3"
+  spec.version       = Bundler::Sbom::VERSION
   spec.authors       = ["SHIBATA Hiroshi"]
   spec.email         = ["hsbt@ruby-lang.org"]
 
-  spec.summary       = %q{Bundler plugin to generate and analyze SBOM}
-  spec.description   = %q{Generate SPDX format SBOM from Gemfile.lock and analyze license information}
+  spec.summary       = "Generate CycloneDX SBOM(Software Bill of Materials) files with Bundler"
+  spec.description   = spec.summary
   spec.homepage      = "https://github.com/hsbt/bundler-sbom"
-  spec.license       = "MIT"
+  spec.required_ruby_version = ">= 2.6.0"
 
-  spec.files         = Dir.glob("{exe,lib}/**/*") + %w(README.md plugins.rb)
+  spec.files         = Dir.chdir(__dir__) do
+    `git ls-files -z`.split("\x0").reject do |f|
+      (File.expand_path(f) == __FILE__) || f.start_with?(*%w[bin/ test/ spec/ features/ .git .circleci appveyor])
+    end
+  end
   spec.bindir        = "exe"
-  spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
+  spec.executables   = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
+
+  spec.add_dependency "bundler", ">= 2.0"
+  spec.add_dependency "thor"
 
   spec.metadata = {
     "homepage_uri" => spec.homepage,
