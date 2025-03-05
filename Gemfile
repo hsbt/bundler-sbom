@@ -4,7 +4,7 @@ gemspec
 
 group :development do
   gem "rake"
-  gem "rspec", "~> 3.12"
+  gem "rspec"
   gem "simplecov", require: false
   gem "rspec-its"
   gem "rspec-mocks"
