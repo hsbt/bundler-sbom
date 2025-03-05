@@ -6,7 +6,7 @@ Gem::Specification.new do |spec|
   spec.authors       = ["SHIBATA Hiroshi"]
   spec.email         = ["hsbt@ruby-lang.org"]
 
-  spec.summary       = "Generate CycloneDX SBOM(Software Bill of Materials) files with Bundler"
+  spec.summary       = "Generate SPDX SBOM(Software Bill of Materials) files with Bundler"
   spec.description   = spec.summary
   spec.homepage      = "https://github.com/hsbt/bundler-sbom"
   spec.license       = "MIT"
