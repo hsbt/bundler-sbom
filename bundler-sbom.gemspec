@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.homepage      = "https://github.com/hsbt/bundler-sbom"
   spec.license       = "MIT"
 
-  spec.files         = Dir.glob("{exe,lib}/**/*") + %w(README.md)
+  spec.files         = Dir.glob("{exe,lib}/**/*") + %w(README.md plugins.rb)
   spec.bindir        = "exe"
   spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
