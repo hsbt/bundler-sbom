@@ -9,13 +9,20 @@ Gem::Specification.new do |spec|
 
   spec.summary       = %q{Bundler plugin to generate and analyze SBOM}
   spec.description   = %q{Generate SPDX format SBOM from Gemfile.lock and analyze license information}
-  spec.homepage      = "https://github.com/hsbt/hsbt"
+  spec.homepage      = "https://github.com/hsbt/bundler-sbom"
   spec.license       = "MIT"
 
   spec.files         = Dir.glob("{exe,lib}/**/*") + %w(README.md)
   spec.bindir        = "exe"
   spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
+
+  spec.metadata = {
+    "homepage_uri" => spec.homepage,
+    "source_code_uri" => spec.homepage,
+    "changelog_uri" => "#{spec.homepage}/blob/main/CHANGELOG.md",
+    "bug_tracker_uri" => "#{spec.homepage}/issues"
+  }
 
   spec.add_development_dependency "bundler", ">= 2.0"
   spec.add_development_dependency "rake"
