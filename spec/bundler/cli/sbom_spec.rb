@@ -35,7 +35,7 @@ RSpec.describe Bundler::Sbom::CLI do
 
     it "generates SBOM and saves to file" do
       expect(Bundler::Sbom::Generator).to receive(:generate_sbom)
-      expect(File).to receive(:write).with("bom.json", "{}")
+      expect(File).to receive(:write).with("bom.json", satisfy { |content| JSON.parse(content) == {} })
       described_class.start(%w[dump])
     end
   end
