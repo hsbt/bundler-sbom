@@ -1,4 +1,3 @@
-require "thor"
 require "json"
 require "bundler/sbom/generator"
 
