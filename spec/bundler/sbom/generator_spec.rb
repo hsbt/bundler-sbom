@@ -125,6 +125,60 @@ RSpec.describe Bundler::Sbom::Generator do
         nil_package = packages.find { |p| p["name"] == "nil-license" }
         expect(nil_package["licenseDeclared"]). to eq("NOASSERTION")
       end
+
+      # SPDX 2.2 Specification Compliance Tests
+      it "contains all required SPDX 2.2 fields" do
+        expect(sbom).to include(
+          "SPDXID",
+          "spdxVersion",
+          "creationInfo",
+          "name",
+          "dataLicense",
+          "documentNamespace"
+        )
+      end
+
+      it "has valid SPDX data license" do
+        expect(sbom["dataLicense"]).to eq("CC0-1.0")
+      end
+
+      it "has valid document namespace format" do
+        expect(sbom["documentNamespace"]).to match(%r{^https://spdx\.org/spdxdocs/[^/]+(?:-[a-f0-9-]+)?$})
+      end
+
+      context "package information compliance" do
+        let(:package) { sbom["packages"].first }
+
+        it "contains required package fields" do
+          expect(package).to include(
+            "SPDXID",
+            "name",
+            "versionInfo",
+            "downloadLocation",
+            "filesAnalyzed",
+            "licenseConcluded",
+            "licenseDeclared"
+          )
+        end
+
+        it "has valid package SPDXID format" do
+          expect(package["SPDXID"]).to match(/^SPDXRef-Package-[A-Za-z0-9.-]+$/)
+        end
+
+        it "has valid external references" do
+          expect(package["externalRefs"]).to be_an(Array)
+          external_ref = package["externalRefs"].first
+          expect(external_ref).to include(
+            "referenceCategory" => "PACKAGE_MANAGER",
+            "referenceType" => "purl",
+            "referenceLocator" => match(%r{^pkg:gem/[^@]+@\d+\.\d+\.\d+$})
+          )
+        end
+
+        it "has correct filesAnalyzed value" do
+          expect(package["filesAnalyzed"]).to be false
+        end
+      end
     end
 
     context "when Gemfile.lock does not exist" do

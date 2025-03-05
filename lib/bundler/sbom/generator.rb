@@ -57,6 +57,7 @@ module Bundler
             "filesAnalyzed" => false,
             "licenseConcluded" => license_string,
             "licenseDeclared" => license_string,
+            "copyrightText" => "NOASSERTION",
             "supplier" => "NOASSERTION",
             "externalRefs" => [
               {
@@ -69,6 +70,7 @@ module Bundler
           sbom["packages"] << package
         end
 
+        sbom["documentDescribes"] = sbom["packages"].map { |p| p["SPDXID"] }
         sbom
       end
 
