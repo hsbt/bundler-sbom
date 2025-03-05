@@ -23,7 +23,4 @@ Gem::Specification.new do |spec|
     "changelog_uri" => "#{spec.homepage}/blob/main/CHANGELOG.md",
     "bug_tracker_uri" => "#{spec.homepage}/issues"
   }
-
-  spec.add_development_dependency "bundler", ">= 2.0"
-  spec.add_development_dependency "rake"
 end
