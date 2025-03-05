@@ -9,6 +9,7 @@ Gem::Specification.new do |spec|
   spec.summary       = "Generate CycloneDX SBOM(Software Bill of Materials) files with Bundler"
   spec.description   = spec.summary
   spec.homepage      = "https://github.com/hsbt/bundler-sbom"
+  spec.license       = "MIT"
   spec.required_ruby_version = ">= 2.6.0"
 
   spec.files         = Dir.chdir(__dir__) do
