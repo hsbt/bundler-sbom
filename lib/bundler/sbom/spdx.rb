@@ -189,6 +189,20 @@ module Bundler
         sbom
       end
 
+      def self.to_report_format(sbom)
+        # SPDXフォーマットは既にレポート形式と互換性があるため、
+        # packagesセクションだけを抽出して返す
+        {
+          "packages" => sbom["packages"].map do |pkg|
+            {
+              "name" => pkg["name"],
+              "versionInfo" => pkg["versionInfo"],
+              "licenseDeclared" => pkg["licenseDeclared"]
+            }
+          end
+        }
+      end
+
       private
       
       def self.add_element(parent, name, value)

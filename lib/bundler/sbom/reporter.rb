@@ -2,12 +2,24 @@ module Bundler
   module Sbom
     class Reporter
       def self.display_license_report(sbom)
-        # Detect SBOM format
-        if sbom_format(sbom) == :cyclonedx
-          # Convert CycloneDX to a format compatible with our reporter
-          sbom = convert_cyclonedx_to_report_format(sbom)
+        # フォーマットに応じて適切な形式に変換
+        sbom = if sbom_format(sbom) == :cyclonedx
+          CycloneDX.to_report_format(sbom)
+        else
+          SPDX.to_report_format(sbom)
         end
         
+        display_report(sbom)
+      end
+
+      private
+
+      def self.sbom_format(sbom)
+        return :cyclonedx if sbom["bomFormat"] == "CycloneDX"
+        return :spdx
+      end
+
+      def self.display_report(sbom)
         license_count = analyze_licenses(sbom)
         sorted_licenses = license_count.sort_by { |_, count| -count }
 
@@ -34,33 +46,6 @@ module Bundler
             puts "  - #{package["name"]} (#{package["versionInfo"]})"
           end
         end
-      end
-
-      private
-
-      # Detect if SBOM is in CycloneDX format
-      def self.sbom_format(sbom)
-        return :cyclonedx if sbom["bomFormat"] == "CycloneDX"
-        return :spdx # default format
-      end
-
-      # Convert CycloneDX format to a structure compatible with our reporter
-      def self.convert_cyclonedx_to_report_format(sbom)
-        {
-          "packages" => sbom["components"].map do |comp|
-            license_string = if comp["licenses"]
-              comp["licenses"].map { |l| l["license"]["id"] }.join(", ")
-            else
-              "NOASSERTION"
-            end
-            
-            {
-              "name" => comp["name"],
-              "versionInfo" => comp["version"],
-              "licenseDeclared" => license_string
-            }
-          end
-        }
       end
 
       def self.analyze_licenses(sbom)

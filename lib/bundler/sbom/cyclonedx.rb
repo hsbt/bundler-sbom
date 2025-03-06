@@ -210,6 +210,23 @@ module Bundler
         converted_sbom
       end
 
+      def self.to_report_format(sbom)
+        {
+          "packages" => sbom["components"].map do |comp|
+            license_string = if comp["licenses"]
+                             comp["licenses"].map { |l| l["license"]["id"] }.join(", ")
+                           else
+                             "NOASSERTION"
+                           end
+            {
+              "name" => comp["name"],
+              "versionInfo" => comp["version"],
+              "licenseDeclared" => license_string
+            }
+          end
+        }
+      end
+
       private
       
       def self.add_element(parent, name, value)
