@@ -22,6 +22,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.add_dependency "bundler", ">= 2.0"
+  spec.add_dependency "rexml"
 
   spec.metadata = {
     "homepage_uri" => spec.homepage,
