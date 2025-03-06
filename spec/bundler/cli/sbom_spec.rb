@@ -26,6 +26,9 @@ RSpec.describe Bundler::Sbom::CLI do
   before(:each) do
     allow(Bundler.ui).to receive(:error)
     allow(Bundler.ui).to receive(:info)
+    # デフォルトでbom.xmlとbom.jsonが存在しないと設定
+    allow(File).to receive(:exist?).with("bom.json").and_return(false)
+    allow(File).to receive(:exist?).with("bom.xml").and_return(false)
   end
 
   describe "#dump" do
@@ -66,6 +69,7 @@ RSpec.describe Bundler::Sbom::CLI do
     context "when bom.json exists" do
       before do
         allow(File).to receive(:exist?).with("bom.json").and_return(true)
+        allow(File).to receive(:exist?).with("bom.xml").and_return(false)
         allow(File).to receive(:read).with("bom.json").and_return(JSON.generate(sample_sbom))
         allow(Bundler::Sbom::Reporter).to receive(:display_license_report)
       end
@@ -105,6 +109,7 @@ RSpec.describe Bundler::Sbom::CLI do
     context "when bom.json does not exist" do
       before do
         allow(File).to receive(:exist?).with("bom.json").and_return(false)
+        allow(File).to receive(:exist?).with("bom.xml").and_return(false)
       end
 
       it "exits with error message" do
@@ -116,6 +121,7 @@ RSpec.describe Bundler::Sbom::CLI do
     context "when bom.json is invalid JSON" do
       before do
         allow(File).to receive(:exist?).with("bom.json").and_return(true)
+        allow(File).to receive(:exist?).with("bom.xml").and_return(false)
         allow(File).to receive(:read).with("bom.json").and_return("invalid json content")
       end
 

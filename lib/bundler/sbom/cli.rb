@@ -28,27 +28,40 @@ module Bundler
         Bundler.ui.info("Generated SBOM at #{output_file}")
       end
       
-      desc "license", "Display license report from existing SBOM file"
-      method_option :format, type: :string, default: "json", desc: "Input format: json or xml", aliases: "-f"
+      desc "license", "Display license report from SBOM file"
+      method_option :file, type: :string, desc: "Input SBOM file path", aliases: "-f"
+      method_option :format, type: :string, desc: "Input format: json or xml", aliases: "-F"
       def license
-        format = options[:format].downcase
-        unless ["json", "xml"].include?(format)
+        format = options[:format]&.downcase
+        input_file = options[:file]
+
+        # Validate format if provided
+        if format && !["json", "xml"].include?(format)
           Bundler.ui.error("Error: Unsupported format '#{format}'. Supported formats: json, xml")
           exit 1
         end
-        
-        input_file = format == "json" ? "bom.json" : "bom.xml"
-        
+
+        # Determine input file based on format or find default files
+        if input_file.nil?
+          if format == "xml" || (format.nil? && File.exist?("bom.xml"))
+            input_file = "bom.xml"
+          else
+            input_file = "bom.json"
+          end
+        end
+
         unless File.exist?(input_file)
-          Bundler.ui.error("Error: #{input_file} not found. Run 'bundle sbom dump --format=#{format}' first.")
+          file_type = File.extname(input_file) == ".xml" ? "xml" : "json"
+          Bundler.ui.error("Error: #{input_file} not found. Run 'bundle sbom dump --format=#{file_type}' first.")
           exit 1
         end
-        
+
         begin
-          sbom = if format == "json"
-            JSON.parse(File.read(input_file))
+          content = File.read(input_file)
+          sbom = if format == "xml" || (!format && File.extname(input_file) == ".xml")
+            Bundler::Sbom::Generator.parse_xml(content)
           else
-            Bundler::Sbom::Generator.parse_xml(File.read(input_file))
+            JSON.parse(content)
           end
           Bundler::Sbom::Reporter.display_license_report(sbom)
         rescue JSON::ParserError
@@ -58,6 +71,11 @@ module Bundler
           Bundler.ui.error("Error processing #{input_file}: #{e.message}")
           exit 1
         end
+      end
+
+      # 適切にエラーで終了することを保証するためのメソッド
+      def self.exit_on_failure?
+        true
       end
     end
   end
