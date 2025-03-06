@@ -91,7 +91,7 @@ RSpec.describe Bundler::Sbom::Generator do
 
       sbom = described_class.generate_sbom
       expect(sbom["SPDXID"]).to eq("SPDXRef-DOCUMENT")
-      expect(sbom["spdxVersion"]).to eq("SPDX-2.2")
+      expect(sbom["spdxVersion"]).to eq("SPDX-2.3")
       expect(sbom["packages"]).to be_an(Array)
     end
 

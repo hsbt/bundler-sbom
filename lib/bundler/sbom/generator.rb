@@ -19,11 +19,11 @@ module Bundler
 
         sbom = {
           "SPDXID" => "SPDXRef-DOCUMENT",
-          "spdxVersion" => "SPDX-2.2",
+          "spdxVersion" => "SPDX-2.3",
           "creationInfo" => {
             "created" => Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "creators" => ["Tool: bundle-sbom"],
-            "licenseListVersion" => "3.17"
+            "licenseListVersion" => "3.20"
           },
           "name" => document_name,
           "dataLicense" => "CC0-1.0",
