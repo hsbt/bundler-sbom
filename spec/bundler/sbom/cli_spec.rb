@@ -4,7 +4,7 @@ require "fileutils"
 
 RSpec.describe Bundler::Sbom::CLI do
   let(:cli) { described_class.new }
-  
+
   around(:each) do |example|
     SpecHelper.with_temp_dir do |dir|
       @temp_dir = dir
@@ -77,7 +77,8 @@ RSpec.describe Bundler::Sbom::CLI do
     context "with json format and cyclonedx SBOM format" do
       it "generates CycloneDX SBOM and saves to bom-cyclonedx.json file" do
         expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("cyclonedx")
-        expect(File).to receive(:write).with("bom-cyclonedx.json", satisfy { |content| JSON.parse(content) == sample_cyclonedx_sbom })
+        expect(File).to receive(:write).with("bom-cyclonedx.json", satisfy { |content|
+ JSON.parse(content) == sample_cyclonedx_sbom })
         expect(Bundler.ui).to receive(:info).with("Generated CYCLONEDX SBOM at bom-cyclonedx.json")
         described_class.start(%w[dump --sbom cyclonedx])
       end

@@ -202,23 +202,23 @@ RSpec.describe Bundler::Sbom::SPDX do
       xml_content = described_class.to_xml(sbom_hash)
       expect(xml_content).to be_a(String)
       expect(xml_content).to include('<?xml version="1.0" encoding="UTF-8"?>')
-      
+
       # Parse XML to verify structure
       doc = REXML::Document.new(xml_content)
       root = doc.root
-      
+
       expect(root.name).to eq("SpdxDocument")
       expect(REXML::XPath.first(root, "SPDXID").text).to eq("SPDXRef-DOCUMENT")
       expect(REXML::XPath.first(root, "spdxVersion").text).to eq("SPDX-2.3")
       expect(REXML::XPath.first(root, "name").text).to eq("test-project")
-      
+
       # Check package information
       package = REXML::XPath.first(root, "package")
       expect(package).not_to be_nil
       expect(REXML::XPath.first(package, "name").text).to eq("rake")
       expect(REXML::XPath.first(package, "versionInfo").text).to eq("13.0.6")
       expect(REXML::XPath.first(package, "licenseDeclared").text).to eq("MIT")
-      
+
       # Check external reference
       ext_ref = REXML::XPath.first(package, "externalRef")
       expect(ext_ref).not_to be_nil
@@ -261,36 +261,36 @@ RSpec.describe Bundler::Sbom::SPDX do
       </SpdxDocument>
       XML
     end
-    
+
     it "parses XML content into SBOM hash" do
       doc = REXML::Document.new(xml_content)
       sbom = described_class.parse_xml(doc)
-      
+
       expect(sbom).to be_a(Hash)
       expect(sbom["SPDXID"]).to eq("SPDXRef-DOCUMENT")
       expect(sbom["spdxVersion"]).to eq("SPDX-2.3")
       expect(sbom["name"]).to eq("test-project")
       expect(sbom["dataLicense"]).to eq("CC0-1.0")
-      
+
       # Check creation info
       expect(sbom["creationInfo"]).to be_a(Hash)
       expect(sbom["creationInfo"]["created"]).to eq("2023-01-01T12:00:00Z")
       expect(sbom["creationInfo"]["creators"]).to include("Tool: bundle-sbom")
-      
+
       # Check packages
       expect(sbom["packages"]).to be_an(Array)
       expect(sbom["packages"].size).to eq(1)
-      
+
       package = sbom["packages"].first
       expect(package["SPDXID"]).to eq("SPDXRef-Package-rake")
       expect(package["name"]).to eq("rake")
       expect(package["versionInfo"]). to eq("13.0.6")
       expect(package["licenseDeclared"]).to eq("MIT")
-      
+
       # Check external refs
       expect(package["externalRefs"]).to be_an(Array)
       expect(package["externalRefs"].size).to eq(1)
-      
+
       ext_ref = package["externalRefs"].first
       expect(ext_ref["referenceCategory"]).to eq("PACKAGE_MANAGER")
       expect(ext_ref["referenceType"]).to eq("purl")

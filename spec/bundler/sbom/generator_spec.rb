@@ -248,7 +248,8 @@ RSpec.describe Bundler::Sbom::Generator do
 
       it "raises error with message" do
         expect(Bundler.ui).to receive(:error).with("No Gemfile.lock found. Run `bundle install` first.")
-        expect { described_class.generate_sbom }.to raise_error(Bundler::Sbom::GemfileLockNotFoundError, "No Gemfile.lock found")
+        expect {
+ described_class.generate_sbom }.to raise_error(Bundler::Sbom::GemfileLockNotFoundError, "No Gemfile.lock found")
       end
     end
   end
@@ -295,23 +296,23 @@ RSpec.describe Bundler::Sbom::Generator do
         xml_content = described_class.convert_to_xml(sbom_hash)
         expect(xml_content).to be_a(String)
         expect(xml_content).to include('<?xml version="1.0" encoding="UTF-8"?>')
-        
+
         # Parse XML to verify structure
         doc = REXML::Document.new(xml_content)
         root = doc.root
-        
+
         expect(root.name).to eq("SpdxDocument")
         expect(REXML::XPath.first(root, "SPDXID").text).to eq("SPDXRef-DOCUMENT")
         expect(REXML::XPath.first(root, "spdxVersion").text).to eq("SPDX-2.3")
         expect(REXML::XPath.first(root, "name").text).to eq("test-project")
-        
+
         # Check package information
         package = REXML::XPath.first(root, "package")
         expect(package).not_to be_nil
         expect(REXML::XPath.first(package, "name").text).to eq("rake")
         expect(REXML::XPath.first(package, "versionInfo").text).to eq("13.0.6")
         expect(REXML::XPath.first(package, "licenseDeclared").text).to eq("MIT")
-        
+
         # Check external reference
         ext_ref = REXML::XPath.first(package, "externalRef")
         expect(ext_ref).not_to be_nil
@@ -381,52 +382,52 @@ RSpec.describe Bundler::Sbom::Generator do
         xml_content = described_class.convert_to_xml(cyclonedx_hash)
         expect(xml_content).to be_a(String)
         expect(xml_content).to include('<?xml version="1.0" encoding="UTF-8"?>')
-        
+
         # Parse XML to verify structure
         doc = REXML::Document.new(xml_content)
         root = doc.root
-        
+
         expect(root.name).to eq("bom")
         expect(root.namespace).to include("cyclonedx.org/schema")
         expect(root.attributes["serialNumber"]).to eq("urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79")
-        
+
         # Check metadata
         metadata = REXML::XPath.first(root, "metadata")
         expect(metadata).not_to be_nil
         expect(REXML::XPath.first(metadata, "timestamp").text).to eq("2023-01-01T12:00:00Z")
-        
+
         # Check tools
         tools = REXML::XPath.first(metadata, "tools")
         expect(tools).not_to be_nil
         tool = REXML::XPath.first(tools, "tool")
         expect(tool).not_to be_nil
         expect(REXML::XPath.first(tool, "name").text).to eq("bundle-sbom")
-        
+
         # Check components
         components = REXML::XPath.first(root, "components")
         expect(components).not_to be_nil
         comps = REXML::XPath.each(components, "component").to_a
         expect(comps.size).to eq(2)
-        
+
         # Check first component
         comp1 = comps[0]
         expect(comp1.attributes["type"]).to eq("library")
         expect(REXML::XPath.first(comp1, "name").text).to eq("rake")
         expect(REXML::XPath.first(comp1, "version").text).to eq("13.0.6")
         expect(REXML::XPath.first(comp1, "purl").text).to eq("pkg:gem/rake@13.0.6")
-        
+
         # Check license in first component
         licenses1 = REXML::XPath.first(comp1, "licenses")
         expect(licenses1).not_to be_nil
         license1 = REXML::XPath.first(licenses1, "license")
         expect(license1).not_to be_nil
         expect(REXML::XPath.first(license1, "id").text).to eq("MIT")
-        
+
         # Check second component with multiple licenses
         comp2 = comps[1]
         expect(comp2.attributes["type"]). to eq("library")
         expect(REXML::XPath.first(comp2, "name").text).to eq("bundler")
-        
+
         # Check licenses in second component
         licenses2 = REXML::XPath.first(comp2, "licenses")
         expect(licenses2).not_to be_nil
@@ -438,7 +439,7 @@ RSpec.describe Bundler::Sbom::Generator do
       end
     end
   end
-  
+
   describe ".parse_xml" do
     context "with SPDX format" do
       let(:xml_content) do
@@ -475,35 +476,35 @@ RSpec.describe Bundler::Sbom::Generator do
         </SpdxDocument>
         XML
       end
-      
+
       it "parses XML content into SBOM hash" do
         sbom = described_class.parse_xml(xml_content)
-        
+
         expect(sbom).to be_a(Hash)
         expect(sbom["SPDXID"]).to eq("SPDXRef-DOCUMENT")
         expect(sbom["spdxVersion"]).to eq("SPDX-2.3")
         expect(sbom["name"]).to eq("test-project")
         expect(sbom["dataLicense"]).to eq("CC0-1.0")
-        
+
         # Check creation info
         expect(sbom["creationInfo"]).to be_a(Hash)
         expect(sbom["creationInfo"]["created"]).to eq("2023-01-01T12:00:00Z")
         expect(sbom["creationInfo"]["creators"]).to include("Tool: bundle-sbom")
-        
+
         # Check packages
         expect(sbom["packages"]).to be_an(Array)
         expect(sbom["packages"].size).to eq(1)
-        
+
         package = sbom["packages"].first
         expect(package["SPDXID"]).to eq("SPDXRef-Package-rake")
         expect(package["name"]). to eq("rake")
         expect(package["versionInfo"]).to eq("13.0.6")
         expect(package["licenseDeclared"]).to eq("MIT")
-        
+
         # Check external refs
         expect(package["externalRefs"]).to be_an(Array)
         expect(package["externalRefs"].size).to eq(1)
-        
+
         ext_ref = package["externalRefs"].first
         expect(ext_ref["referenceCategory"]).to eq("PACKAGE_MANAGER")
         expect(ext_ref["referenceType"]). to eq("purl")
@@ -561,18 +562,18 @@ RSpec.describe Bundler::Sbom::Generator do
 
       it "parses CycloneDX XML content and converts to Reporter-compatible format" do
         sbom = described_class.parse_xml(cyclonedx_xml_content)
-        
+
         # The result should be converted to a Reporter-compatible format
         expect(sbom).to be_a(Hash)
         expect(sbom["packages"]).to be_an(Array)
         expect(sbom["packages"].size).to eq(2)
-        
+
         # Check first package
         rake_package = sbom["packages"].find { |p| p["name"] == "rake" }
         expect(rake_package).not_to be_nil
         expect(rake_package["versionInfo"]).to eq("13.0.6")
         expect(rake_package["licenseDeclared"]).to eq("MIT")
-        
+
         # Check second package with multiple licenses
         bundler_package = sbom["packages"].find { |p| p["name"] == "bundler" }
         expect(bundler_package).not_to be_nil
@@ -580,7 +581,7 @@ RSpec.describe Bundler::Sbom::Generator do
         expect(bundler_package["licenseDeclared"]).to eq("MIT, Apache-2.0")
       end
     end
-    
+
     it "handles malformed XML gracefully" do
       malformed_xml = "<invalid>XML Content"
       expect { described_class.parse_xml(malformed_xml) }.to raise_error(REXML::ParseException)

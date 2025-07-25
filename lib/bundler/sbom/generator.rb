@@ -39,7 +39,7 @@ module Bundler
       def self.parse_xml(xml_content)
         doc = REXML::Document.new(xml_content)
         root = doc.root
-        
+
         # Determine if it's CycloneDX or SPDX
         if root.name == "bom" && root.namespace.include?("cyclonedx.org")
           CycloneDX.parse_xml(doc)

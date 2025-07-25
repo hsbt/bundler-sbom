@@ -8,7 +8,7 @@ module Bundler
         else
           SPDX.to_report_format(sbom)
         end
-        
+
         display_report(sbom)
       end
 
