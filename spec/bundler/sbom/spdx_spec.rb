@@ -229,36 +229,36 @@ RSpec.describe Bundler::Sbom::SPDX do
   describe ".parse_xml" do
     let(:xml_content) do
       <<~XML
-      <?xml version="1.0" encoding="UTF-8"?>
-      <SpdxDocument xmlns="https://spdx.org/spdxdocs/">
-        <SPDXID>SPDXRef-DOCUMENT</SPDXID>
-        <spdxVersion>SPDX-2.3</spdxVersion>
-        <name>test-project</name>
-        <dataLicense>CC0-1.0</dataLicense>
-        <documentNamespace>https://spdx.org/spdxdocs/test-project-123</documentNamespace>
-        <creationInfo>
-          <created>2023-01-01T12:00:00Z</created>
-          <creator>Tool: bundle-sbom</creator>
-          <licenseListVersion>3.20</licenseListVersion>
-        </creationInfo>
-        <documentDescribes>SPDXRef-Package-rake</documentDescribes>
-        <package>
-          <SPDXID>SPDXRef-Package-rake</SPDXID>
-          <name>rake</name>
-          <versionInfo>13.0.6</versionInfo>
-          <downloadLocation>NOASSERTION</downloadLocation>
-          <filesAnalyzed>false</filesAnalyzed>
-          <licenseConcluded>MIT</licenseConcluded>
-          <licenseDeclared>MIT</licenseDeclared>
-          <copyrightText>NOASSERTION</copyrightText>
-          <supplier>NOASSERTION</supplier>
-          <externalRef>
-            <referenceCategory>PACKAGE_MANAGER</referenceCategory>
-            <referenceType>purl</referenceType>
-            <referenceLocator>pkg:gem/rake@13.0.6</referenceLocator>
-          </externalRef>
-        </package>
-      </SpdxDocument>
+        <?xml version="1.0" encoding="UTF-8"?>
+        <SpdxDocument xmlns="https://spdx.org/spdxdocs/">
+          <SPDXID>SPDXRef-DOCUMENT</SPDXID>
+          <spdxVersion>SPDX-2.3</spdxVersion>
+          <name>test-project</name>
+          <dataLicense>CC0-1.0</dataLicense>
+          <documentNamespace>https://spdx.org/spdxdocs/test-project-123</documentNamespace>
+          <creationInfo>
+            <created>2023-01-01T12:00:00Z</created>
+            <creator>Tool: bundle-sbom</creator>
+            <licenseListVersion>3.20</licenseListVersion>
+          </creationInfo>
+          <documentDescribes>SPDXRef-Package-rake</documentDescribes>
+          <package>
+            <SPDXID>SPDXRef-Package-rake</SPDXID>
+            <name>rake</name>
+            <versionInfo>13.0.6</versionInfo>
+            <downloadLocation>NOASSERTION</downloadLocation>
+            <filesAnalyzed>false</filesAnalyzed>
+            <licenseConcluded>MIT</licenseConcluded>
+            <licenseDeclared>MIT</licenseDeclared>
+            <copyrightText>NOASSERTION</copyrightText>
+            <supplier>NOASSERTION</supplier>
+            <externalRef>
+              <referenceCategory>PACKAGE_MANAGER</referenceCategory>
+              <referenceType>purl</referenceType>
+              <referenceLocator>pkg:gem/rake@13.0.6</referenceLocator>
+            </externalRef>
+          </package>
+        </SpdxDocument>
       XML
     end
 
@@ -284,7 +284,7 @@ RSpec.describe Bundler::Sbom::SPDX do
       package = sbom["packages"].first
       expect(package["SPDXID"]).to eq("SPDXRef-Package-rake")
       expect(package["name"]).to eq("rake")
-      expect(package["versionInfo"]). to eq("13.0.6")
+      expect(package["versionInfo"]).to eq("13.0.6")
       expect(package["licenseDeclared"]).to eq("MIT")
 
       # Check external refs

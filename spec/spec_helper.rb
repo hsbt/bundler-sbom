@@ -16,7 +16,7 @@ module SpecHelper
   end
 
   def self.reset_env!
-    ENV.delete_if { |k,_| k.start_with?("BUNDLER_") }
+    ENV.delete_if { |k, _| k.start_with?("BUNDLER_") }
     ENV["BUNDLE_DISABLE_POSTIT"] = "1"
     ENV["BUNDLE_USER_CONFIG"] = "/dev/null"
     ENV["BUNDLE_USER_CACHE"] = "/dev/null"

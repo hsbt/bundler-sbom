@@ -287,48 +287,48 @@ RSpec.describe Bundler::Sbom::CycloneDX do
   describe ".parse_xml" do
     let(:cyclonedx_xml_content) do
       <<~XML
-      <?xml version="1.0" encoding="UTF-8"?>
-      <bom xmlns="http://cyclonedx.org/schema/bom/1.4" serialNumber="urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79" version="1">
-        <metadata>
-          <timestamp>2023-01-01T12:00:00Z</timestamp>
-          <tools>
-            <tool>
-              <vendor>Bundler</vendor>
-              <name>bundle-sbom</name>
-              <version>0.1.0</version>
-            </tool>
-          </tools>
-          <component type="application">
-            <name>test-project</name>
-            <version>0.0.0</version>
-          </component>
-        </metadata>
-        <components>
-          <component type="library">
-            <name>rake</name>
-            <version>13.0.6</version>
-            <purl>pkg:gem/rake@13.0.6</purl>
-            <licenses>
-              <license>
-                <id>MIT</id>
-              </license>
-            </licenses>
-          </component>
-          <component type="library">
-            <name>bundler</name>
-            <version>2.4.0</version>
-            <purl>pkg:gem/bundler@2.4.0</purl>
-            <licenses>
-              <license>
-                <id>MIT</id>
-              </license>
-              <license>
-                <id>Apache-2.0</id>
-              </license>
-            </licenses>
-          </component>
-        </components>
-      </bom>
+        <?xml version="1.0" encoding="UTF-8"?>
+        <bom xmlns="http://cyclonedx.org/schema/bom/1.4" serialNumber="urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79" version="1">
+          <metadata>
+            <timestamp>2023-01-01T12:00:00Z</timestamp>
+            <tools>
+              <tool>
+                <vendor>Bundler</vendor>
+                <name>bundle-sbom</name>
+                <version>0.1.0</version>
+              </tool>
+            </tools>
+            <component type="application">
+              <name>test-project</name>
+              <version>0.0.0</version>
+            </component>
+          </metadata>
+          <components>
+            <component type="library">
+              <name>rake</name>
+              <version>13.0.6</version>
+              <purl>pkg:gem/rake@13.0.6</purl>
+              <licenses>
+                <license>
+                  <id>MIT</id>
+                </license>
+              </licenses>
+            </component>
+            <component type="library">
+              <name>bundler</name>
+              <version>2.4.0</version>
+              <purl>pkg:gem/bundler@2.4.0</purl>
+              <licenses>
+                <license>
+                  <id>MIT</id>
+                </license>
+                <license>
+                  <id>Apache-2.0</id>
+                </license>
+              </licenses>
+            </component>
+          </components>
+        </bom>
       XML
     end
 

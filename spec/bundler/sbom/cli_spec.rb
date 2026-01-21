@@ -18,7 +18,7 @@ RSpec.describe Bundler::Sbom::CLI do
     {
       "SPDXID" => "SPDXRef-DOCUMENT",
       "packages" => [
-        { "name" => "rake", "versionInfo" => "13.0.6", "licenseDeclared" => "MIT" }
+        {"name" => "rake", "versionInfo" => "13.0.6", "licenseDeclared" => "MIT"}
       ]
     }
   end
@@ -30,7 +30,7 @@ RSpec.describe Bundler::Sbom::CLI do
       "serialNumber" => "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
       "version" => 1,
       "components" => [
-        { "name" => "rake", "version" => "13.0.6", "type" => "library" }
+        {"name" => "rake", "version" => "13.0.6", "type" => "library"}
       ]
     }
   end
@@ -78,7 +78,8 @@ RSpec.describe Bundler::Sbom::CLI do
       it "generates CycloneDX SBOM and saves to bom-cyclonedx.json file" do
         expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("cyclonedx")
         expect(File).to receive(:write).with("bom-cyclonedx.json", satisfy { |content|
- JSON.parse(content) == sample_cyclonedx_sbom })
+          JSON.parse(content) == sample_cyclonedx_sbom
+        })
         expect(Bundler.ui).to receive(:info).with("Generated CYCLONEDX SBOM at bom-cyclonedx.json")
         described_class.start(%w[dump --sbom cyclonedx])
       end

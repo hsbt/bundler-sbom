@@ -56,7 +56,7 @@ module Bundler
           }
 
           unless licenses.empty?
-            component["licenses"] = licenses.map { |license| { "license" => { "id" => license } } }
+            component["licenses"] = licenses.map { |license| {"license" => {"id" => license}} }
           end
 
           sbom["components"] << component
@@ -74,7 +74,7 @@ module Bundler
         root.add_namespace("http://cyclonedx.org/schema/bom/1.4")
         root.add_attributes({
           "serialNumber" => sbom["serialNumber"],
-          "version" => sbom["version"].to_s,
+          "version" => sbom["version"].to_s
         })
         doc.add_element(root)
 
@@ -184,7 +184,7 @@ module Bundler
           licenses = []
           REXML::XPath.each(comp, "licenses/license") do |license|
             license_id = get_element_text(license, "id")
-            licenses << { "license" => { "id" => license_id } } if license_id
+            licenses << {"license" => {"id" => license_id}} if license_id
           end
 
           component["licenses"] = licenses unless licenses.empty?
@@ -192,12 +192,12 @@ module Bundler
         end
 
         # Convert CycloneDX format to SPDX-like format for compatibility with Reporter
-        converted_sbom = {
+        {
           "packages" => sbom["components"].map do |comp|
             license_string = if comp["licenses"]
               comp["licenses"].map { |l| l["license"]["id"] }.join(", ")
-                            else
-                              "NOASSERTION"
+            else
+              "NOASSERTION"
             end
             {
               "name" => comp["name"],
@@ -206,8 +206,6 @@ module Bundler
             }
           end
         }
-
-        converted_sbom
       end
 
       def self.to_report_format(sbom)
@@ -215,8 +213,8 @@ module Bundler
           "packages" => sbom["components"].map do |comp|
             license_string = if comp["licenses"]
               comp["licenses"].map { |l| l["license"]["id"] }.join(", ")
-                           else
-                             "NOASSERTION"
+            else
+              "NOASSERTION"
             end
             {
               "name" => comp["name"],

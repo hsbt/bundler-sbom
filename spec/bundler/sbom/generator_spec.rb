@@ -249,7 +249,8 @@ RSpec.describe Bundler::Sbom::Generator do
       it "raises error with message" do
         expect(Bundler.ui).to receive(:error).with("No Gemfile.lock found. Run `bundle install` first.")
         expect {
- described_class.generate_sbom }.to raise_error(Bundler::Sbom::GemfileLockNotFoundError, "No Gemfile.lock found")
+          described_class.generate_sbom
+        }.to raise_error(Bundler::Sbom::GemfileLockNotFoundError, "No Gemfile.lock found")
       end
     end
   end
@@ -425,7 +426,7 @@ RSpec.describe Bundler::Sbom::Generator do
 
         # Check second component with multiple licenses
         comp2 = comps[1]
-        expect(comp2.attributes["type"]). to eq("library")
+        expect(comp2.attributes["type"]).to eq("library")
         expect(REXML::XPath.first(comp2, "name").text).to eq("bundler")
 
         # Check licenses in second component
@@ -444,36 +445,36 @@ RSpec.describe Bundler::Sbom::Generator do
     context "with SPDX format" do
       let(:xml_content) do
         <<~XML
-        <?xml version="1.0" encoding="UTF-8"?>
-        <SpdxDocument xmlns="https://spdx.org/spdxdocs/">
-          <SPDXID>SPDXRef-DOCUMENT</SPDXID>
-          <spdxVersion>SPDX-2.3</spdxVersion>
-          <name>test-project</name>
-          <dataLicense>CC0-1.0</dataLicense>
-          <documentNamespace>https://spdx.org/spdxdocs/test-project-123</documentNamespace>
-          <creationInfo>
-            <created>2023-01-01T12:00:00Z</created>
-            <creator>Tool: bundle-sbom</creator>
-            <licenseListVersion>3.20</licenseListVersion>
-          </creationInfo>
-          <documentDescribes>SPDXRef-Package-rake</documentDescribes>
-          <package>
-            <SPDXID>SPDXRef-Package-rake</SPDXID>
-            <name>rake</name>
-            <versionInfo>13.0.6</versionInfo>
-            <downloadLocation>NOASSERTION</downloadLocation>
-            <filesAnalyzed>false</filesAnalyzed>
-            <licenseConcluded>MIT</licenseConcluded>
-            <licenseDeclared>MIT</licenseDeclared>
-            <copyrightText>NOASSERTION</copyrightText>
-            <supplier>NOASSERTION</supplier>
-            <externalRef>
-              <referenceCategory>PACKAGE_MANAGER</referenceCategory>
-              <referenceType>purl</referenceType>
-              <referenceLocator>pkg:gem/rake@13.0.6</referenceLocator>
-            </externalRef>
-          </package>
-        </SpdxDocument>
+          <?xml version="1.0" encoding="UTF-8"?>
+          <SpdxDocument xmlns="https://spdx.org/spdxdocs/">
+            <SPDXID>SPDXRef-DOCUMENT</SPDXID>
+            <spdxVersion>SPDX-2.3</spdxVersion>
+            <name>test-project</name>
+            <dataLicense>CC0-1.0</dataLicense>
+            <documentNamespace>https://spdx.org/spdxdocs/test-project-123</documentNamespace>
+            <creationInfo>
+              <created>2023-01-01T12:00:00Z</created>
+              <creator>Tool: bundle-sbom</creator>
+              <licenseListVersion>3.20</licenseListVersion>
+            </creationInfo>
+            <documentDescribes>SPDXRef-Package-rake</documentDescribes>
+            <package>
+              <SPDXID>SPDXRef-Package-rake</SPDXID>
+              <name>rake</name>
+              <versionInfo>13.0.6</versionInfo>
+              <downloadLocation>NOASSERTION</downloadLocation>
+              <filesAnalyzed>false</filesAnalyzed>
+              <licenseConcluded>MIT</licenseConcluded>
+              <licenseDeclared>MIT</licenseDeclared>
+              <copyrightText>NOASSERTION</copyrightText>
+              <supplier>NOASSERTION</supplier>
+              <externalRef>
+                <referenceCategory>PACKAGE_MANAGER</referenceCategory>
+                <referenceType>purl</referenceType>
+                <referenceLocator>pkg:gem/rake@13.0.6</referenceLocator>
+              </externalRef>
+            </package>
+          </SpdxDocument>
         XML
       end
 
@@ -497,7 +498,7 @@ RSpec.describe Bundler::Sbom::Generator do
 
         package = sbom["packages"].first
         expect(package["SPDXID"]).to eq("SPDXRef-Package-rake")
-        expect(package["name"]). to eq("rake")
+        expect(package["name"]).to eq("rake")
         expect(package["versionInfo"]).to eq("13.0.6")
         expect(package["licenseDeclared"]).to eq("MIT")
 
@@ -507,56 +508,56 @@ RSpec.describe Bundler::Sbom::Generator do
 
         ext_ref = package["externalRefs"].first
         expect(ext_ref["referenceCategory"]).to eq("PACKAGE_MANAGER")
-        expect(ext_ref["referenceType"]). to eq("purl")
-        expect(ext_ref["referenceLocator"]). to eq("pkg:gem/rake@13.0.6")
+        expect(ext_ref["referenceType"]).to eq("purl")
+        expect(ext_ref["referenceLocator"]).to eq("pkg:gem/rake@13.0.6")
       end
     end
 
     context "with CycloneDX format" do
       let(:cyclonedx_xml_content) do
         <<~XML
-        <?xml version="1.0" encoding="UTF-8"?>
-        <bom xmlns="http://cyclonedx.org/schema/bom/1.4" serialNumber="urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79" version="1">
-          <metadata>
-            <timestamp>2023-01-01T12:00:00Z</timestamp>
-            <tools>
-              <tool>
-                <vendor>Bundler</vendor>
-                <name>bundle-sbom</name>
-                <version>0.1.0</version>
-              </tool>
-            </tools>
-            <component type="application">
-              <name>test-project</name>
-              <version>0.0.0</version>
-            </component>
-          </metadata>
-          <components>
-            <component type="library">
-              <name>rake</name>
-              <version>13.0.6</version>
-              <purl>pkg:gem/rake@13.0.6</purl>
-              <licenses>
-                <license>
-                  <id>MIT</id>
-                </license>
-              </licenses>
-            </component>
-            <component type="library">
-              <name>bundler</name>
-              <version>2.4.0</version>
-              <purl>pkg:gem/bundler@2.4.0</purl>
-              <licenses>
-                <license>
-                  <id>MIT</id>
-                </license>
-                <license>
-                  <id>Apache-2.0</id>
-                </license>
-              </licenses>
-            </component>
-          </components>
-        </bom>
+          <?xml version="1.0" encoding="UTF-8"?>
+          <bom xmlns="http://cyclonedx.org/schema/bom/1.4" serialNumber="urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79" version="1">
+            <metadata>
+              <timestamp>2023-01-01T12:00:00Z</timestamp>
+              <tools>
+                <tool>
+                  <vendor>Bundler</vendor>
+                  <name>bundle-sbom</name>
+                  <version>0.1.0</version>
+                </tool>
+              </tools>
+              <component type="application">
+                <name>test-project</name>
+                <version>0.0.0</version>
+              </component>
+            </metadata>
+            <components>
+              <component type="library">
+                <name>rake</name>
+                <version>13.0.6</version>
+                <purl>pkg:gem/rake@13.0.6</purl>
+                <licenses>
+                  <license>
+                    <id>MIT</id>
+                  </license>
+                </licenses>
+              </component>
+              <component type="library">
+                <name>bundler</name>
+                <version>2.4.0</version>
+                <purl>pkg:gem/bundler@2.4.0</purl>
+                <licenses>
+                  <license>
+                    <id>MIT</id>
+                  </license>
+                  <license>
+                    <id>Apache-2.0</id>
+                  </license>
+                </licenses>
+              </component>
+            </components>
+          </bom>
         XML
       end
 

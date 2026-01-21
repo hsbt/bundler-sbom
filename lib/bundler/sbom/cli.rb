@@ -28,10 +28,10 @@ module Bundler
         sbom = Bundler::Sbom::Generator.generate_sbom(sbom_format)
 
         # Determine file extension based on output format
-        ext = format == "json" ? "json" : "xml"
+        ext = (format == "json") ? "json" : "xml"
 
         # Determine filename prefix based on SBOM format
-        prefix = sbom_format == "spdx" ? "bom" : "bom-cyclonedx"
+        prefix = (sbom_format == "spdx") ? "bom" : "bom-cyclonedx"
         output_file = "#{prefix}.#{ext}"
 
         if format == "json"
@@ -59,19 +59,19 @@ module Bundler
 
         # Determine input file based on format or find default files
         if input_file.nil?
-          if format == "xml" || (format.nil? && File.exist?("bom.xml"))
-            input_file = "bom.xml"
+          input_file = if format == "xml" || (format.nil? && File.exist?("bom.xml"))
+            "bom.xml"
           elsif File.exist?("bom-cyclonedx.json")
-            input_file = "bom-cyclonedx.json"
+            "bom-cyclonedx.json"
           elsif File.exist?("bom-cyclonedx.xml")
-            input_file = "bom-cyclonedx.xml"
+            "bom-cyclonedx.xml"
           else
-            input_file = "bom.json"
+            "bom.json"
           end
         end
 
         unless File.exist?(input_file)
-          file_type = File.extname(input_file) == ".xml" ? "xml" : "json"
+          file_type = (File.extname(input_file) == ".xml") ? "xml" : "json"
           sbom_type = input_file.include?("cyclonedx") ? "cyclonedx" : "spdx"
           Bundler.ui.error("Error: #{input_file} not found. Run 'bundle sbom dump --format=#{file_type} --sbom=#{sbom_type}' first.")
           exit 1
@@ -90,7 +90,7 @@ module Bundler
         rescue JSON::ParserError
           Bundler.ui.error("Error: #{input_file} is not a valid JSON file")
           exit 1
-        rescue StandardError => e
+        rescue => e
           Bundler.ui.error("Error processing #{input_file}: #{e.message}")
           exit 1
         end

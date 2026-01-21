@@ -82,12 +82,12 @@ RSpec.describe Bundler::Sbom::Reporter do
 
   describe ".sbom_format" do
     it "correctly detects CycloneDX format" do
-      cyclonedx_sbom = { "bomFormat" => "CycloneDX" }
+      cyclonedx_sbom = {"bomFormat" => "CycloneDX"}
       expect(described_class.sbom_format(cyclonedx_sbom)).to eq(:cyclonedx)
     end
 
     it "defaults to SPDX format" do
-      spdx_sbom = { "SPDXID" => "SPDXRef-DOCUMENT" }
+      spdx_sbom = {"SPDXID" => "SPDXRef-DOCUMENT"}
       expect(described_class.sbom_format(spdx_sbom)).to eq(:spdx)
     end
   end
@@ -100,7 +100,7 @@ RSpec.describe Bundler::Sbom::Reporter do
           {
             "name" => "rake",
             "version" => "13.0.6",
-            "licenses" => [{ "license" => { "id" => "MIT" } }]
+            "licenses" => [{"license" => {"id" => "MIT"}}]
           }
         ]
       }

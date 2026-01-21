@@ -16,7 +16,7 @@ module Bundler
 
       def self.sbom_format(sbom)
         return :cyclonedx if sbom["bomFormat"] == "CycloneDX"
-        return :spdx
+        :spdx
       end
 
       def self.display_report(sbom)
