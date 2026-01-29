@@ -1,6 +1,5 @@
 require "bundler"
 require "securerandom"
-require "set"
 require "rexml/document"
 
 module Bundler

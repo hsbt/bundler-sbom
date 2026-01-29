@@ -177,24 +177,24 @@ RSpec.describe Bundler::Sbom::Generator do
           double(name: "herb", version: Gem::Version.new("1.0.0")),
           double(name: "rake", version: Gem::Version.new("13.0.6"))
         ]
-        
+
         allow(Bundler::LockfileParser).to receive(:new).and_return(
           double(specs: specs_with_duplicates)
         )
         allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
 
         sbom = described_class.generate_sbom
-        
+
         # Should only have 2 packages, not 4
         expect(sbom["packages"].size).to eq(2)
-        
+
         # documentDescribes should also have 2 entries
         expect(sbom["documentDescribes"].size).to eq(2)
-        
+
         # Verify herb appears only once
         herb_packages = sbom["packages"].select { |p| p["name"] == "herb" }
         expect(herb_packages.size).to eq(1)
-        
+
         # Verify rake appears only once
         rake_packages = sbom["packages"].select { |p| p["name"] == "rake" }
         expect(rake_packages.size).to eq(1)
@@ -277,21 +277,21 @@ RSpec.describe Bundler::Sbom::Generator do
           double(name: "herb", version: Gem::Version.new("1.0.0")),
           double(name: "rake", version: Gem::Version.new("13.0.6"))
         ]
-        
+
         allow(Bundler::LockfileParser).to receive(:new).and_return(
           double(specs: specs_with_duplicates)
         )
         allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
 
         sbom = described_class.generate_sbom("cyclonedx")
-        
+
         # Should only have 2 components, not 4
         expect(sbom["components"].size).to eq(2)
-        
+
         # Verify herb appears only once
         herb_components = sbom["components"].select { |c| c["name"] == "herb" }
         expect(herb_components.size).to eq(1)
-        
+
         # Verify rake appears only once
         rake_components = sbom["components"].select { |c| c["name"] == "rake" }
         expect(rake_components.size).to eq(1)
