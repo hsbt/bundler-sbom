@@ -21,7 +21,12 @@ module Bundler
           "packages" => []
         }
 
+        # Deduplicate specs by name and version
+        seen_gems = Set.new
         lockfile.specs.each do |spec|
+          gem_key = "#{spec.name}:#{spec.version}"
+          next if seen_gems.include?(gem_key)
+          seen_gems.add(gem_key)
           begin
             gemspec = Gem::Specification.find_by_name(spec.name, spec.version)
             licenses = []
