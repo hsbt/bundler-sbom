@@ -86,8 +86,8 @@ RSpec.describe Bundler::Sbom::CycloneDX do
 
   describe ".generate" do
     it "generates CycloneDX SBOM document" do
-      lockfile = double(specs: [])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = []
+      sbom = described_class.generate(gems, "test-project")
       expect(sbom["bomFormat"]).to eq("CycloneDX")
       expect(sbom["specVersion"]).to eq("1.4")
       expect(sbom["serialNumber"]).to match(/^urn:uuid:[0-9a-f-]+$/)
@@ -99,8 +99,8 @@ RSpec.describe Bundler::Sbom::CycloneDX do
         .with("rake", Gem::Version.new("13.0.6"))
         .and_return(rake_spec)
 
-      lockfile = double(specs: [double(name: "rake", version: Gem::Version.new("13.0.6"))])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = [double(name: "rake", version: Gem::Version.new("13.0.6"))]
+      sbom = described_class.generate(gems, "test-project")
 
       component = sbom["components"].find { |c| c["name"] == "rake" }
       expect(component).not_to be_nil
@@ -117,8 +117,8 @@ RSpec.describe Bundler::Sbom::CycloneDX do
         .with("bundler", Gem::Version.new("2.4.0"))
         .and_return(multi_license_spec)
 
-      lockfile = double(specs: [double(name: "bundler", version: Gem::Version.new("2.4.0"))])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = [double(name: "bundler", version: Gem::Version.new("2.4.0"))]
+      sbom = described_class.generate(gems, "test-project")
 
       component = sbom["components"].find { |c| c["name"] == "bundler" }
       expect(component).not_to be_nil
@@ -133,8 +133,8 @@ RSpec.describe Bundler::Sbom::CycloneDX do
         .with("no-license", Gem::Version.new("1.0.0"))
         .and_return(empty_license_spec)
 
-      lockfile = double(specs: [double(name: "no-license", version: Gem::Version.new("1.0.0"))])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = [double(name: "no-license", version: Gem::Version.new("1.0.0"))]
+      sbom = described_class.generate(gems, "test-project")
 
       component = sbom["components"].find { |c| c["name"] == "no-license" }
       expect(component).not_to be_nil
@@ -146,8 +146,8 @@ RSpec.describe Bundler::Sbom::CycloneDX do
         .with("missing-gem", anything)
         .and_raise(Gem::LoadError)
 
-      lockfile = double(specs: [double(name: "missing-gem", version: Gem::Version.new("1.0.0"))])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = [double(name: "missing-gem", version: Gem::Version.new("1.0.0"))]
+      sbom = described_class.generate(gems, "test-project")
 
       component = sbom["components"].find { |c| c["name"] == "missing-gem" }
       expect(component).not_to be_nil
@@ -155,8 +155,8 @@ RSpec.describe Bundler::Sbom::CycloneDX do
     end
 
     it "includes metadata with timestamp and tools" do
-      lockfile = double(specs: [])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = []
+      sbom = described_class.generate(gems, "test-project")
 
       expect(sbom["metadata"]).to be_a(Hash)
       expect(sbom["metadata"]["timestamp"]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/)

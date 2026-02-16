@@ -86,8 +86,8 @@ RSpec.describe Bundler::Sbom::SPDX do
 
   describe ".generate" do
     it "generates SBOM document" do
-      lockfile = double(specs: [])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = []
+      sbom = described_class.generate(gems, "test-project")
       expect(sbom["SPDXID"]).to eq("SPDXRef-DOCUMENT")
       expect(sbom["spdxVersion"]).to eq("SPDX-2.3")
       expect(sbom["packages"]).to be_an(Array)
@@ -98,8 +98,8 @@ RSpec.describe Bundler::Sbom::SPDX do
         .with("rake", Gem::Version.new("13.0.6"))
         .and_return(rake_spec)
 
-      lockfile = double(specs: [double(name: "rake", version: Gem::Version.new("13.0.6"))])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = [double(name: "rake", version: Gem::Version.new("13.0.6"))]
+      sbom = described_class.generate(gems, "test-project")
 
       package = sbom["packages"].find { |p| p["name"] == "rake" }
       expect(package).not_to be_nil
@@ -113,8 +113,8 @@ RSpec.describe Bundler::Sbom::SPDX do
         .with("bundler", Gem::Version.new("2.4.0"))
         .and_return(multi_license_spec)
 
-      lockfile = double(specs: [double(name: "bundler", version: Gem::Version.new("2.4.0"))])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = [double(name: "bundler", version: Gem::Version.new("2.4.0"))]
+      sbom = described_class.generate(gems, "test-project")
 
       package = sbom["packages"].find { |p| p["name"] == "bundler" }
       expect(package).not_to be_nil
@@ -126,8 +126,8 @@ RSpec.describe Bundler::Sbom::SPDX do
         .with("no-license", Gem::Version.new("1.0.0"))
         .and_return(empty_license_spec)
 
-      lockfile = double(specs: [double(name: "no-license", version: Gem::Version.new("1.0.0"))])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = [double(name: "no-license", version: Gem::Version.new("1.0.0"))]
+      sbom = described_class.generate(gems, "test-project")
 
       package = sbom["packages"].find { |p| p["name"] == "no-license" }
       expect(package).not_to be_nil
@@ -139,8 +139,8 @@ RSpec.describe Bundler::Sbom::SPDX do
         .with("nil-license", Gem::Version.new("1.0.0"))
         .and_return(nil_license_spec)
 
-      lockfile = double(specs: [double(name: "nil-license", version: Gem::Version.new("1.0.0"))])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = [double(name: "nil-license", version: Gem::Version.new("1.0.0"))]
+      sbom = described_class.generate(gems, "test-project")
 
       package = sbom["packages"].find { |p| p["name"] == "nil-license" }
       expect(package).not_to be_nil
@@ -152,8 +152,8 @@ RSpec.describe Bundler::Sbom::SPDX do
         .with("missing-gem", anything)
         .and_raise(Gem::LoadError)
 
-      lockfile = double(specs: [double(name: "missing-gem", version: Gem::Version.new("1.0.0"))])
-      sbom = described_class.generate(lockfile, "test-project")
+      gems = [double(name: "missing-gem", version: Gem::Version.new("1.0.0"))]
+      sbom = described_class.generate(gems, "test-project")
 
       package = sbom["packages"].find { |p| p["name"] == "missing-gem" }
       expect(package).not_to be_nil
