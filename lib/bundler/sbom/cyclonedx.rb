@@ -5,7 +5,7 @@ require "rexml/document"
 module Bundler
   module Sbom
     class CycloneDX
-      def self.generate(lockfile, document_name)
+      def self.generate(gems, document_name)
         serial_number = SecureRandom.uuid
         timestamp = Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
         sbom = {
@@ -33,7 +33,7 @@ module Bundler
 
         # Deduplicate specs by name and version
         seen_gems = Set.new
-        lockfile.specs.each do |spec|
+        gems.each do |spec|
           gem_key = "#{spec.name}:#{spec.version}"
           next if seen_gems.include?(gem_key)
           seen_gems.add(gem_key)

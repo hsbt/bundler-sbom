@@ -199,6 +199,165 @@ RSpec.describe Bundler::Sbom::Generator do
         rake_packages = sbom["packages"].select { |p| p["name"] == "rake" }
         expect(rake_packages.size).to eq(1)
       end
+
+      it "filters out excluded groups" do
+        # Mock Bundler.definition
+        development_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
+        production_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
+
+        all_specs = [production_gem, development_gem]
+
+        allow(Bundler::LockfileParser).to receive(:new).and_return(
+          double(specs: all_specs)
+        )
+
+        # Mock Bundler.definition
+        definition = double
+        allow(Bundler).to receive(:definition).and_return(definition)
+        allow(definition).to receive(:groups).and_return([:default, :development])
+        allow(definition).to receive(:dependencies_for).with(:default).and_return([
+          double(name: "rails")
+        ])
+        allow(definition).to receive(:dependencies_for).with(:development).and_return([
+          double(name: "rspec")
+        ])
+
+        allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
+
+        # Generate SBOM without development group
+        sbom = described_class.generate_sbom("spdx", without_groups: [:development])
+
+        # Should only have rails, not rspec
+        expect(sbom["packages"].size).to eq(1)
+        expect(sbom["packages"].first["name"]).to eq("rails")
+      end
+
+      it "includes transitive dependencies of included groups" do
+        # Setup: rails (default) -> activesupport (transitive)
+        #        rspec (development) -> diff-lcs (transitive)
+        rails_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
+        activesupport_gem = double(name: "activesupport", version: Gem::Version.new("7.0.0"))
+        rspec_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
+        diff_lcs_gem = double(name: "diff-lcs", version: Gem::Version.new("1.5.0"))
+
+        all_specs = [rails_gem, activesupport_gem, rspec_gem, diff_lcs_gem]
+
+        allow(Bundler::LockfileParser).to receive(:new).and_return(
+          double(specs: all_specs)
+        )
+
+        # Mock Bundler.definition to show dependency relationships
+        definition = double
+        allow(Bundler).to receive(:definition).and_return(definition)
+        allow(definition).to receive(:groups).and_return([:default, :development])
+
+        # Direct dependencies only
+        allow(definition).to receive(:dependencies_for).with(:default).and_return([
+          double(name: "rails")
+        ])
+        allow(definition).to receive(:dependencies_for).with(:development).and_return([
+          double(name: "rspec")
+        ])
+
+        # Mock specs_for to return transitive dependencies
+        allow(definition).to receive(:specs_for).with([:default]).and_return([
+          rails_gem, activesupport_gem
+        ])
+
+        allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
+
+        # Generate SBOM without development group
+        sbom = described_class.generate_sbom("spdx", without_groups: [:development])
+
+        # Should have rails AND activesupport (transitive), but not rspec or diff-lcs
+        package_names = sbom["packages"].map { |p| p["name"] }
+        expect(package_names).to contain_exactly("rails", "activesupport")
+      end
+
+      it "excludes transitive dependencies of excluded groups" do
+        # Setup: rails (default) has no transitive deps
+        #        rspec (development) -> diff-lcs (transitive)
+        rails_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
+        rspec_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
+        diff_lcs_gem = double(name: "diff-lcs", version: Gem::Version.new("1.5.0"))
+
+        all_specs = [rails_gem, rspec_gem, diff_lcs_gem]
+
+        allow(Bundler::LockfileParser).to receive(:new).and_return(
+          double(specs: all_specs)
+        )
+
+        definition = double
+        allow(Bundler).to receive(:definition).and_return(definition)
+        allow(definition).to receive(:groups).and_return([:default, :development])
+
+        allow(definition).to receive(:dependencies_for).with(:default).and_return([
+          double(name: "rails")
+        ])
+        allow(definition).to receive(:dependencies_for).with(:development).and_return([
+          double(name: "rspec")
+        ])
+
+        # Mock specs_for to return transitive dependencies
+        allow(definition).to receive(:specs_for).with([:default]).and_return([
+          rails_gem
+        ])
+
+        allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
+
+        # Generate SBOM without development group
+        sbom = described_class.generate_sbom("spdx", without_groups: [:development])
+
+        # Should only have rails, not rspec or its transitive dependency diff-lcs
+        package_names = sbom["packages"].map { |p| p["name"] }
+        expect(package_names).to contain_exactly("rails")
+      end
+
+      it "handles shared transitive dependencies correctly" do
+        # Setup: rails (default) -> activesupport (shared transitive)
+        #        rspec (development) -> activesupport (shared transitive)
+        #        minitest (test) has no transitive deps
+        rails_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
+        rspec_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
+        minitest_gem = double(name: "minitest", version: Gem::Version.new("5.18.0"))
+        activesupport_gem = double(name: "activesupport", version: Gem::Version.new("7.0.0"))
+
+        all_specs = [rails_gem, rspec_gem, minitest_gem, activesupport_gem]
+
+        allow(Bundler::LockfileParser).to receive(:new).and_return(
+          double(specs: all_specs)
+        )
+
+        definition = double
+        allow(Bundler).to receive(:definition).and_return(definition)
+        allow(definition).to receive(:groups).and_return([:default, :development, :test])
+
+        # Direct dependencies
+        allow(definition).to receive(:dependencies_for).with(:default).and_return([
+          double(name: "rails")
+        ])
+        allow(definition).to receive(:dependencies_for).with(:development).and_return([
+          double(name: "rspec")
+        ])
+        allow(definition).to receive(:dependencies_for).with(:test).and_return([
+          double(name: "minitest")
+        ])
+
+        # Mock specs_for: both default and test groups transitively depend on activesupport
+        allow(definition).to receive(:specs_for).with([:default, :test]).and_return([
+          rails_gem, minitest_gem, activesupport_gem
+        ])
+
+        allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
+
+        # Generate SBOM excluding development group
+        sbom = described_class.generate_sbom("spdx", without_groups: [:development])
+
+        # Should include rails, minitest, and activesupport (shared transitive)
+        # Should NOT include rspec (excluded group)
+        package_names = sbom["packages"].map { |p| p["name"] }
+        expect(package_names).to contain_exactly("rails", "minitest", "activesupport")
+      end
     end
 
     context "with CycloneDX format" do
@@ -295,6 +454,38 @@ RSpec.describe Bundler::Sbom::Generator do
         # Verify rake appears only once
         rake_components = sbom["components"].select { |c| c["name"] == "rake" }
         expect(rake_components.size).to eq(1)
+      end
+
+      it "filters out excluded groups" do
+        # Mock Bundler.definition
+        development_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
+        production_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
+
+        all_specs = [production_gem, development_gem]
+
+        allow(Bundler::LockfileParser).to receive(:new).and_return(
+          double(specs: all_specs)
+        )
+
+        # Mock Bundler.definition
+        definition = double
+        allow(Bundler).to receive(:definition).and_return(definition)
+        allow(definition).to receive(:groups).and_return([:default, :development])
+        allow(definition).to receive(:dependencies_for).with(:default).and_return([
+          double(name: "rails")
+        ])
+        allow(definition).to receive(:dependencies_for).with(:development).and_return([
+          double(name: "rspec")
+        ])
+
+        allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
+
+        # Generate SBOM without development group
+        sbom = described_class.generate_sbom("cyclonedx", without_groups: [:development])
+
+        # Should only have rails, not rspec
+        expect(sbom["components"].size).to eq(1)
+        expect(sbom["components"].first["name"]).to eq("rails")
       end
     end
 

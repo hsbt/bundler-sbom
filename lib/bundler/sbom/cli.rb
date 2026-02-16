@@ -8,9 +8,11 @@ module Bundler
       desc "dump", "Generate SBOM and save to file"
       method_option :format, type: :string, default: "json", desc: "Output format: json or xml", aliases: "-f"
       method_option :sbom, type: :string, default: "spdx", desc: "SBOM format: spdx or cyclonedx", aliases: "-s"
+      method_option :without, type: :string, desc: "Exclude groups (comma or colon separated, e.g., 'development:test' or 'development,test')"
       def dump
         format = options[:format].downcase
         sbom_format = options[:sbom].downcase
+        without_groups = parse_without_groups(options[:without])
 
         # Validate output format
         unless ["json", "xml"].include?(format)
@@ -25,7 +27,7 @@ module Bundler
         end
 
         # Generate SBOM based on specified format
-        sbom = Bundler::Sbom::Generator.generate_sbom(sbom_format)
+        sbom = Bundler::Sbom::Generator.generate_sbom(sbom_format, without_groups: without_groups)
 
         # Determine file extension based on output format
         ext = (format == "json") ? "json" : "xml"
@@ -99,6 +101,16 @@ module Bundler
       # 適切にエラーで終了することを保証するためのメソッド
       def self.exit_on_failure?
         true
+      end
+
+      private
+
+      def parse_without_groups(without_option)
+        return [] unless without_option
+
+        # Split by comma or colon and clean up whitespace
+        groups = without_option.split(%r{[:,]}).map(&:strip).reject(&:empty?)
+        groups.map(&:to_sym)
       end
     end
   end

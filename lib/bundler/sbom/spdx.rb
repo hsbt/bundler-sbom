@@ -5,7 +5,7 @@ require "rexml/document"
 module Bundler
   module Sbom
     class SPDX
-      def self.generate(lockfile, document_name)
+      def self.generate(gems, document_name)
         spdx_id = generate_spdx_id
         sbom = {
           "SPDXID" => "SPDXRef-DOCUMENT",
@@ -23,7 +23,7 @@ module Bundler
 
         # Deduplicate specs by name and version
         seen_gems = Set.new
-        lockfile.specs.each do |spec|
+        gems.each do |spec|
           gem_key = "#{spec.name}:#{spec.version}"
           next if seen_gems.include?(gem_key)
           seen_gems.add(gem_key)
