@@ -250,7 +250,7 @@ RSpec.describe Bundler::Sbom::Generator do
         definition = double
         allow(Bundler).to receive(:definition).and_return(definition)
         allow(definition).to receive(:groups).and_return([:default, :development])
-        
+
         # Direct dependencies only
         allow(definition).to receive(:dependencies_for).with(:default).and_return([
           double(name: "rails")
@@ -290,7 +290,7 @@ RSpec.describe Bundler::Sbom::Generator do
         definition = double
         allow(Bundler).to receive(:definition).and_return(definition)
         allow(definition).to receive(:groups).and_return([:default, :development])
-        
+
         allow(definition).to receive(:dependencies_for).with(:default).and_return([
           double(name: "rails")
         ])
@@ -331,7 +331,7 @@ RSpec.describe Bundler::Sbom::Generator do
         definition = double
         allow(Bundler).to receive(:definition).and_return(definition)
         allow(definition).to receive(:groups).and_return([:default, :development, :test])
-        
+
         # Direct dependencies
         allow(definition).to receive(:dependencies_for).with(:default).and_return([
           double(name: "rails")
