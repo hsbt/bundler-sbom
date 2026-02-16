@@ -30,4 +30,5 @@ Gemfile.lock
 .ruby-gemset
 
 # RSpec state
-.rspec_statusvendor/bundle
+.rspec_status
+vendor/bundle
