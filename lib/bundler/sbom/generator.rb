@@ -67,7 +67,7 @@ module Bundler
             include_groups = all_groups - without_groups
 
             # Use specs_for to get all gems (including transitive dependencies) for included groups
-            result = if definition.respond_to?(:specs_for)
+            filtered_specs = if definition.respond_to?(:specs_for)
               definition.specs_for(include_groups)
             else
               # Fallback to old method if specs_for is not available
@@ -80,7 +80,7 @@ module Bundler
               lockfile.specs.select { |spec| included_gems.include?(spec.name) }
             end
 
-            result
+            filtered_specs
           rescue => e
             # Fallback to all specs if there's any issue with Bundler.definition
             Bundler.ui.warn("Warning: Could not determine group information: #{e.message}")
