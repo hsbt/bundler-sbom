@@ -199,6 +199,38 @@ RSpec.describe Bundler::Sbom::Generator do
         rake_packages = sbom["packages"].select { |p| p["name"] == "rake" }
         expect(rake_packages.size).to eq(1)
       end
+
+      it "filters out excluded groups" do
+        # Mock Bundler.definition
+        development_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
+        production_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
+
+        all_specs = [production_gem, development_gem]
+
+        allow(Bundler::LockfileParser).to receive(:new).and_return(
+          double(specs: all_specs)
+        )
+
+        # Mock Bundler.definition
+        definition = double
+        allow(Bundler).to receive(:definition).and_return(definition)
+        allow(definition).to receive(:groups).and_return([:default, :development])
+        allow(definition).to receive(:dependencies_for).with(:default).and_return([
+          double(name: "rails")
+        ])
+        allow(definition).to receive(:dependencies_for).with(:development).and_return([
+          double(name: "rspec")
+        ])
+
+        allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
+
+        # Generate SBOM without development group
+        sbom = described_class.generate_sbom("spdx", without_groups: [:development])
+
+        # Should only have rails, not rspec
+        expect(sbom["packages"].size).to eq(1)
+        expect(sbom["packages"].first["name"]).to eq("rails")
+      end
     end
 
     context "with CycloneDX format" do
@@ -295,6 +327,38 @@ RSpec.describe Bundler::Sbom::Generator do
         # Verify rake appears only once
         rake_components = sbom["components"].select { |c| c["name"] == "rake" }
         expect(rake_components.size).to eq(1)
+      end
+
+      it "filters out excluded groups" do
+        # Mock Bundler.definition
+        development_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
+        production_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
+
+        all_specs = [production_gem, development_gem]
+
+        allow(Bundler::LockfileParser).to receive(:new).and_return(
+          double(specs: all_specs)
+        )
+
+        # Mock Bundler.definition
+        definition = double
+        allow(Bundler).to receive(:definition).and_return(definition)
+        allow(definition).to receive(:groups).and_return([:default, :development])
+        allow(definition).to receive(:dependencies_for).with(:default).and_return([
+          double(name: "rails")
+        ])
+        allow(definition).to receive(:dependencies_for).with(:development).and_return([
+          double(name: "rspec")
+        ])
+
+        allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
+
+        # Generate SBOM without development group
+        sbom = described_class.generate_sbom("cyclonedx", without_groups: [:development])
+
+        # Should only have rails, not rspec
+        expect(sbom["components"].size).to eq(1)
+        expect(sbom["components"].first["name"]).to eq("rails")
       end
     end
 
