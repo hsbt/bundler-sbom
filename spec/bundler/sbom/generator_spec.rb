@@ -309,8 +309,10 @@ RSpec.describe Bundler::Sbom::Generator do
         sbom = described_class.generate_sbom("spdx", without_groups: [:development])
 
         # Should only have rails, not rspec or its transitive dependency diff-lcs
-        expect(sbom["packages"].size).to eq(1)
-        expect(sbom["packages"].first["name"]).to eq("rails")
+        package_names = sbom["packages"].map { |p| p["name"] }
+        expect(package_names).to contain_exactly("rails")
+        expect(package_names).not_to include("rspec")
+        expect(package_names).not_to include("diff-lcs")
       end
 
       it "handles shared transitive dependencies correctly" do
