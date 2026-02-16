@@ -80,7 +80,7 @@ module Bundler
               lockfile.specs.select { |spec| included_gems.include?(spec.name) }
             end
 
-            return result
+            result
           rescue => e
             # Fallback to all specs if there's any issue with Bundler.definition
             Bundler.ui.warn("Warning: Could not determine group information: #{e.message}")
