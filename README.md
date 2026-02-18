@@ -23,6 +23,7 @@ $ bundle sbom dump [options]
 Available options:
 - `-f, --format FORMAT`: Output format (json or xml, default: json)
 - `-s, --sbom FORMAT`: SBOM specification format (spdx or cyclonedx, default: spdx)
+- `--without GROUPS`: Exclude groups (comma or colon separated, e.g., 'development:test' or 'development,test')
 
 Generated files will be named according to the following pattern:
 - SPDX format: `bom.json` or `bom.xml`
@@ -34,6 +35,8 @@ $ bundle sbom dump                           # Generates SPDX format in JSON (bo
 $ bundle sbom dump -f xml                    # Generates SPDX format in XML (bom.xml)
 $ bundle sbom dump -s cyclonedx             # Generates CycloneDX format in JSON (bom-cyclonedx.json)
 $ bundle sbom dump -s cyclonedx -f xml      # Generates CycloneDX format in XML (bom-cyclonedx.xml)
+$ bundle sbom dump --without development    # Excludes development group
+$ bundle sbom dump --without development:test  # Excludes development and test groups
 ```
 
 ### Analyze License Information
