@@ -1,15 +1,11 @@
 require "bundler"
 require "securerandom"
-require "rexml/document"
+require "bundler/sbom/sbom_document"
 
 module Bundler
   module Sbom
     class CycloneDX
-      attr_reader :data
-
-      def initialize(data)
-        @data = data
-      end
+      include SbomDocument
 
       def self.generate(gem_data, document_name)
         serial_number = SecureRandom.uuid
@@ -105,10 +101,6 @@ module Bundler
         new(sbom)
       end
 
-      def to_hash
-        @data
-      end
-
       def to_xml
         doc = REXML::Document.new
         doc << REXML::XMLDecl.new("1.0", "UTF-8")
@@ -172,11 +164,7 @@ module Bundler
           end
         end
 
-        formatter = REXML::Formatters::Pretty.new(2)
-        formatter.compact = true
-        output = ""
-        formatter.write(doc, output)
-        output.sub(%r{<\?xml version='1\.0' encoding='UTF-8'\?>}, '<?xml version="1.0" encoding="UTF-8"?>')
+        format_xml(doc)
       end
 
       def to_report_format
@@ -195,20 +183,6 @@ module Bundler
           end
         }
       end
-
-      private
-
-      def add_element(parent, name, value)
-        element = REXML::Element.new(name)
-        element.text = value
-        parent.add_element(element)
-      end
-
-      def self.get_element_text(element, xpath)
-        result = REXML::XPath.first(element, xpath)
-        result ? result.text : nil
-      end
-      private_class_method :get_element_text
     end
   end
 end
