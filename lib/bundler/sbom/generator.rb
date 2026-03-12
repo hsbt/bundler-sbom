@@ -1,6 +1,4 @@
 require "bundler"
-require "securerandom"
-require "json"
 require "rexml/document"
 require "bundler/sbom/spdx"
 require "bundler/sbom/cyclonedx"
