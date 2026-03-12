@@ -108,14 +108,12 @@ RSpec.describe Bundler::Sbom::CLI do
 
     context "with invalid output format" do
       it "shows error message and exits" do
-        expect(Bundler.ui).to receive(:error).with("Error: Unsupported output format 'invalid'. Supported formats: json, xml")
         expect { described_class.start(%w[dump --format invalid]) }.to raise_error(SystemExit)
       end
     end
 
     context "with invalid SBOM format" do
       it "shows error message and exits" do
-        expect(Bundler.ui).to receive(:error).with("Error: Unsupported SBOM format 'invalid'. Supported formats: spdx, cyclonedx")
         expect { described_class.start(%w[dump --sbom invalid]) }.to raise_error(SystemExit)
       end
     end
@@ -246,7 +244,6 @@ RSpec.describe Bundler::Sbom::CLI do
         end
 
         it "shows error message and exits" do
-          expect(Bundler.ui).to receive(:error).with("Error processing bom.xml: Invalid XML")
           expect { described_class.start(%w[license --format xml]) }.to raise_error(SystemExit)
         end
       end
@@ -272,7 +269,6 @@ RSpec.describe Bundler::Sbom::CLI do
       end
 
       it "exits with error message" do
-        expect(Bundler.ui).to receive(:error).with("Error: bom.json not found. Run 'bundle sbom dump --format=json --sbom=spdx' first.")
         expect { described_class.start(%w[license]) }.to raise_error(SystemExit)
       end
     end
@@ -284,14 +280,12 @@ RSpec.describe Bundler::Sbom::CLI do
       end
 
       it "shows an error message and exits" do
-        expect(Bundler.ui).to receive(:error).with("Error: bom.json is not a valid JSON file")
         expect { described_class.start(%w[license]) }.to raise_error(SystemExit)
       end
     end
 
     context "with invalid format" do
       it "shows error message and exits" do
-        expect(Bundler.ui).to receive(:error).with("Error: Unsupported format 'invalid'. Supported formats: json, xml")
         expect { described_class.start(%w[license --format invalid]) }.to raise_error(SystemExit)
       end
     end

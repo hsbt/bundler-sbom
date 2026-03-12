@@ -14,32 +14,24 @@ module Bundler
         sbom_format = options[:sbom].downcase
         without_groups = parse_without_groups(options[:without])
 
-        # Validate output format
         unless ["json", "xml"].include?(format)
-          Bundler.ui.error("Error: Unsupported output format '#{format}'. Supported formats: json, xml")
-          exit 1
+          raise Thor::Error, "Error: Unsupported output format '#{format}'. Supported formats: json, xml"
         end
 
-        # Validate SBOM format
         unless ["spdx", "cyclonedx"].include?(sbom_format)
-          Bundler.ui.error("Error: Unsupported SBOM format '#{sbom_format}'. Supported formats: spdx, cyclonedx")
-          exit 1
+          raise Thor::Error, "Error: Unsupported SBOM format '#{sbom_format}'. Supported formats: spdx, cyclonedx"
         end
 
-        # Generate SBOM based on specified format
         generator = Bundler::Sbom::Generator.new(format: sbom_format, without_groups: without_groups)
         sbom = generator.generate
 
-        # Determine file extension based on output format
         ext = (format == "json") ? "json" : "xml"
-
-        # Determine filename prefix based on SBOM format
         prefix = (sbom_format == "spdx") ? "bom" : "bom-cyclonedx"
         output_file = "#{prefix}.#{ext}"
 
         if format == "json"
           File.write(output_file, JSON.pretty_generate(sbom.to_hash))
-        else # xml
+        else
           File.write(output_file, sbom.to_xml)
         end
 
@@ -53,13 +45,10 @@ module Bundler
         format = options[:format]&.downcase
         input_file = options[:file]
 
-        # Validate format if provided
         if format && !["json", "xml"].include?(format)
-          Bundler.ui.error("Error: Unsupported format '#{format}'. Supported formats: json, xml")
-          exit 1
+          raise Thor::Error, "Error: Unsupported format '#{format}'. Supported formats: json, xml"
         end
 
-        # Determine input file based on format or find default files
         if input_file.nil?
           input_file = if format == "xml" || (format.nil? && File.exist?("bom.xml"))
             "bom.xml"
@@ -75,27 +64,24 @@ module Bundler
         unless File.exist?(input_file)
           file_type = (File.extname(input_file) == ".xml") ? "xml" : "json"
           sbom_type = input_file.include?("cyclonedx") ? "cyclonedx" : "spdx"
-          Bundler.ui.error("Error: #{input_file} not found. Run 'bundle sbom dump --format=#{file_type} --sbom=#{sbom_type}' first.")
-          exit 1
+          raise Thor::Error, "Error: #{input_file} not found. Run 'bundle sbom dump --format=#{file_type} --sbom=#{sbom_type}' first."
         end
 
-        begin
-          content = File.read(input_file)
+        content = File.read(input_file)
 
-          sbom = if format == "xml" || (!format && File.extname(input_file) == ".xml")
-            Bundler::Sbom::Generator.parse_xml(content)
-          else
-            Bundler::Sbom::Generator.from_hash(JSON.parse(content))
-          end
-
-          Bundler::Sbom::Reporter.new(sbom).display_license_report
-        rescue JSON::ParserError
-          Bundler.ui.error("Error: #{input_file} is not a valid JSON file")
-          exit 1
-        rescue => e
-          Bundler.ui.error("Error processing #{input_file}: #{e.message}")
-          exit 1
+        sbom = if format == "xml" || (!format && File.extname(input_file) == ".xml")
+          Bundler::Sbom::Generator.parse_xml(content)
+        else
+          Bundler::Sbom::Generator.from_hash(JSON.parse(content))
         end
+
+        Bundler::Sbom::Reporter.new(sbom).display_license_report
+      rescue JSON::ParserError
+        raise Thor::Error, "Error: #{input_file} is not a valid JSON file"
+      rescue Thor::Error
+        raise
+      rescue => e
+        raise Thor::Error, "Error processing #{input_file}: #{e.message}"
       end
 
       def self.exit_on_failure?
