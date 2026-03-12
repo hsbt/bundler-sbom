@@ -195,18 +195,18 @@ module Bundler
         }
       end
 
-      private
-
       def self.add_element(parent, name, value)
         element = REXML::Element.new(name)
         element.text = value
         parent.add_element(element)
       end
+      private_class_method :add_element
 
       def self.get_element_text(element, xpath)
         result = REXML::XPath.first(element, xpath)
         result ? result.text : nil
       end
+      private_class_method :get_element_text
     end
   end
 end

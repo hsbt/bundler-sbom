@@ -24,35 +24,6 @@ RSpec.describe Bundler::Sbom::Reporter do
     }
   end
 
-  describe ".analyze_licenses" do
-    it "correctly counts license occurrences" do
-      result = described_class.analyze_licenses(simple_sbom)
-      expect(result["MIT"]).to eq(2)
-      expect(result["Apache-2.0"]).to eq(1)
-    end
-
-    it "handles packages with no license" do
-      sbom_with_no_license = {
-        "packages" => [
-          {
-            "name" => "rake",
-            "versionInfo" => "13.0.6",
-            "licenseDeclared" => "NOASSERTION"
-          }
-        ]
-      }
-      result = described_class.analyze_licenses(sbom_with_no_license)
-      expect(result["NOASSERTION"]).to eq(1)
-    end
-
-    context "when sbom has no packages" do
-      it "returns empty hash" do
-        result = described_class.analyze_licenses(empty_sbom)
-        expect(result).to be_empty
-      end
-    end
-  end
-
   describe ".display_license_report" do
     it "outputs formatted license report" do
       expect { described_class.display_license_report(simple_sbom) }.to output(/License Usage in SBOM/).to_stdout
@@ -77,18 +48,6 @@ RSpec.describe Bundler::Sbom::Reporter do
         expect { described_class.display_license_report(empty_sbom) }
           .to output(/Total packages: 0/).to_stdout
       end
-    end
-  end
-
-  describe ".sbom_format" do
-    it "correctly detects CycloneDX format" do
-      cyclonedx_sbom = {"bomFormat" => "CycloneDX"}
-      expect(described_class.sbom_format(cyclonedx_sbom)).to eq(:cyclonedx)
-    end
-
-    it "defaults to SPDX format" do
-      spdx_sbom = {"SPDXID" => "SPDXRef-DOCUMENT"}
-      expect(described_class.sbom_format(spdx_sbom)).to eq(:spdx)
     end
   end
 

@@ -12,12 +12,11 @@ module Bundler
         display_report(sbom)
       end
 
-      private
-
       def self.sbom_format(sbom)
         return :cyclonedx if sbom["bomFormat"] == "CycloneDX"
         :spdx
       end
+      private_class_method :sbom_format
 
       def self.display_report(sbom)
         license_count = analyze_licenses(sbom)
@@ -58,6 +57,7 @@ module Bundler
         end
         license_count
       end
+      private_class_method :display_report, :analyze_licenses
     end
   end
 end
