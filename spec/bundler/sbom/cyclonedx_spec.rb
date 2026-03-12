@@ -154,6 +154,57 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       expect(component["licenses"]).to be_nil
     end
 
+    it "uses materialized spec for git-sourced gems" do
+      materialized_gemspec = double(
+        "materialized_gemspec",
+        license: "BSD-2-Clause",
+        licenses: ["BSD-2-Clause"]
+      )
+      spec = double(
+        "git_spec",
+        name: "colorize",
+        version: Gem::Version.new("1.1.0"),
+        __materialize__: materialized_gemspec
+      )
+
+      gems = [spec]
+      sbom = described_class.generate(gems, "test-project")
+
+      component = sbom["components"].find { |c| c["name"] == "colorize" }
+      expect(component).not_to be_nil
+      expect(component["licenses"]).to be_an(Array)
+      expect(component["licenses"].first["license"]["id"]).to eq("BSD-2-Clause")
+    end
+
+    it "does not use globally installed gem license for git-sourced gems" do
+      materialized_gemspec = double(
+        "materialized_gemspec",
+        license: "BSD-2-Clause",
+        licenses: ["BSD-2-Clause"]
+      )
+      globally_installed_gemspec = double(
+        "global_gemspec",
+        license: "MIT",
+        licenses: ["MIT"]
+      )
+      spec = double(
+        "git_spec",
+        name: "colorize",
+        version: Gem::Version.new("1.1.0"),
+        __materialize__: materialized_gemspec
+      )
+
+      allow(Gem::Specification).to receive(:find_by_name)
+        .with("colorize", Gem::Version.new("1.1.0"))
+        .and_return(globally_installed_gemspec)
+
+      gems = [spec]
+      sbom = described_class.generate(gems, "test-project")
+
+      component = sbom["components"].find { |c| c["name"] == "colorize" }
+      expect(component["licenses"].first["license"]["id"]).to eq("BSD-2-Clause")
+    end
+
     it "includes metadata with timestamp and tools" do
       gems = []
       sbom = described_class.generate(gems, "test-project")
