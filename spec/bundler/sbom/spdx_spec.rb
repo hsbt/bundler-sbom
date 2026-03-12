@@ -147,6 +147,56 @@ RSpec.describe Bundler::Sbom::SPDX do
       expect(package["licenseDeclared"]).to eq("NOASSERTION")
     end
 
+    it "uses materialized spec for git-sourced gems" do
+      materialized_gemspec = double(
+        "materialized_gemspec",
+        license: "BSD-2-Clause",
+        licenses: ["BSD-2-Clause"]
+      )
+      spec = double(
+        "git_spec",
+        name: "colorize",
+        version: Gem::Version.new("1.1.0"),
+        __materialize__: materialized_gemspec
+      )
+
+      gems = [spec]
+      sbom = described_class.generate(gems, "test-project")
+
+      package = sbom["packages"].find { |p| p["name"] == "colorize" }
+      expect(package).not_to be_nil
+      expect(package["licenseDeclared"]).to eq("BSD-2-Clause")
+    end
+
+    it "does not use globally installed gem license for git-sourced gems" do
+      materialized_gemspec = double(
+        "materialized_gemspec",
+        license: "BSD-2-Clause",
+        licenses: ["BSD-2-Clause"]
+      )
+      globally_installed_gemspec = double(
+        "global_gemspec",
+        license: "MIT",
+        licenses: ["MIT"]
+      )
+      spec = double(
+        "git_spec",
+        name: "colorize",
+        version: Gem::Version.new("1.1.0"),
+        __materialize__: materialized_gemspec
+      )
+
+      allow(Gem::Specification).to receive(:find_by_name)
+        .with("colorize", Gem::Version.new("1.1.0"))
+        .and_return(globally_installed_gemspec)
+
+      gems = [spec]
+      sbom = described_class.generate(gems, "test-project")
+
+      package = sbom["packages"].find { |p| p["name"] == "colorize" }
+      expect(package["licenseDeclared"]).to eq("BSD-2-Clause")
+    end
+
     it "handles Gem::LoadError gracefully" do
       allow(Gem::Specification).to receive(:find_by_name)
         .with("missing-gem", anything)

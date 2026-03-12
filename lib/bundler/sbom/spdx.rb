@@ -27,22 +27,8 @@ module Bundler
           gem_key = "#{spec.name}:#{spec.version}"
           next if seen_gems.include?(gem_key)
           seen_gems.add(gem_key)
-          begin
-            gemspec = Gem::Specification.find_by_name(spec.name, spec.version)
-            licenses = []
-            if gemspec
-              if gemspec.license && !gemspec.license.empty?
-                licenses << gemspec.license
-              end
-              if gemspec.licenses && !gemspec.licenses.empty?
-                licenses.concat(gemspec.licenses)
-              end
-              licenses.uniq!
-            end
-            license_string = licenses.empty? ? "NOASSERTION" : licenses.join(", ")
-          rescue Gem::LoadError
-            license_string = "NOASSERTION"
-          end
+          licenses = SpecLicenseFinder.find_licenses(spec)
+          license_string = licenses.empty? ? "NOASSERTION" : licenses.join(", ")
 
           package = {
             "SPDXID" => "SPDXRef-Package-#{spec.name}",

@@ -37,21 +37,7 @@ module Bundler
           gem_key = "#{spec.name}:#{spec.version}"
           next if seen_gems.include?(gem_key)
           seen_gems.add(gem_key)
-          begin
-            gemspec = Gem::Specification.find_by_name(spec.name, spec.version)
-            licenses = []
-            if gemspec
-              if gemspec.license && !gemspec.license.empty?
-                licenses << gemspec.license
-              end
-              if gemspec.licenses && !gemspec.licenses.empty?
-                licenses.concat(gemspec.licenses)
-              end
-              licenses.uniq!
-            end
-          rescue Gem::LoadError
-            licenses = []
-          end
+          licenses = SpecLicenseFinder.find_licenses(spec)
 
           component = {
             "type" => "library",
