@@ -387,22 +387,23 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       doc = REXML::Document.new(cyclonedx_xml_content)
       sbom = described_class.parse_xml(doc)
 
-      # The result should be converted to a Reporter-compatible format
+      # The result should be raw CycloneDX format
       expect(sbom).to be_a(Hash)
-      expect(sbom["packages"]).to be_an(Array)
-      expect(sbom["packages"].size).to eq(2)
+      expect(sbom["bomFormat"]).to eq("CycloneDX")
+      expect(sbom["components"]).to be_an(Array)
+      expect(sbom["components"].size).to eq(2)
 
-      # Check first package
-      rake_package = sbom["packages"].find { |p| p["name"] == "rake" }
-      expect(rake_package).not_to be_nil
-      expect(rake_package["versionInfo"]).to eq("13.0.6")
-      expect(rake_package["licenseDeclared"]).to eq("MIT")
+      # Check first component
+      rake_comp = sbom["components"].find { |c| c["name"] == "rake" }
+      expect(rake_comp).not_to be_nil
+      expect(rake_comp["version"]).to eq("13.0.6")
+      expect(rake_comp["licenses"]).to eq([{"license" => {"id" => "MIT"}}])
 
-      # Check second package with multiple licenses
-      bundler_package = sbom["packages"].find { |p| p["name"] == "bundler" }
-      expect(bundler_package).not_to be_nil
-      expect(bundler_package["versionInfo"]).to eq("2.4.0")
-      expect(bundler_package["licenseDeclared"]).to eq("MIT, Apache-2.0")
+      # Check second component with multiple licenses
+      bundler_comp = sbom["components"].find { |c| c["name"] == "bundler" }
+      expect(bundler_comp).not_to be_nil
+      expect(bundler_comp["version"]).to eq("2.4.0")
+      expect(bundler_comp["licenses"]).to eq([{"license" => {"id" => "MIT"}}, {"license" => {"id" => "Apache-2.0"}}])
     end
   end
 end

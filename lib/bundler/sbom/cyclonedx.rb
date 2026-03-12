@@ -182,21 +182,7 @@ module Bundler
           sbom["components"] << component
         end
 
-        # Convert CycloneDX format to SPDX-like format for compatibility with Reporter
-        {
-          "packages" => sbom["components"].map do |comp|
-            license_string = if comp["licenses"]
-              comp["licenses"].map { |l| l["license"]["id"] }.join(", ")
-            else
-              "NOASSERTION"
-            end
-            {
-              "name" => comp["name"],
-              "versionInfo" => comp["version"],
-              "licenseDeclared" => license_string
-            }
-          end
-        }
+        sbom
       end
 
       def self.to_report_format(sbom)

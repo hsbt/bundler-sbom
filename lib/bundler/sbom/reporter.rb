@@ -23,15 +23,15 @@ module Bundler
         license_count = analyze_licenses(sbom)
         sorted_licenses = license_count.sort_by { |_, count| -count }
 
-        puts "=== License Usage in SBOM ==="
-        puts "Total packages: #{sbom["packages"].size}"
-        puts
+        Bundler.ui.info "=== License Usage in SBOM ==="
+        Bundler.ui.info "Total packages: #{sbom["packages"].size}"
+        Bundler.ui.info ""
 
         sorted_licenses.each do |license, count|
-          puts "#{license}: #{count} package(s)"
+          Bundler.ui.info "#{license}: #{count} package(s)"
         end
 
-        puts "\n=== Packages by License ==="
+        Bundler.ui.info "\n=== Packages by License ==="
         sorted_licenses.each do |license, _|
           packages = sbom["packages"].select do |package|
             if package["licenseDeclared"].include?(",")
@@ -41,9 +41,9 @@ module Bundler
             end
           end
 
-          puts "\n#{license} (#{packages.size} package(s)):"
+          Bundler.ui.info "\n#{license} (#{packages.size} package(s)):"
           packages.each do |package|
-            puts "  - #{package["name"]} (#{package["versionInfo"]})"
+            Bundler.ui.info "  - #{package["name"]} (#{package["versionInfo"]})"
           end
         end
       end
