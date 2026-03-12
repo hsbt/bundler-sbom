@@ -11,7 +11,12 @@ module Bundler
 
         licenses = []
         if gemspec
-          licenses.concat(gemspec.licenses) if gemspec.respond_to?(:licenses) && gemspec.licenses && !gemspec.licenses.empty?
+          if gemspec.respond_to?(:license) && gemspec.license && !gemspec.license.empty?
+            licenses << gemspec.license
+          end
+          if gemspec.respond_to?(:licenses) && gemspec.licenses && !gemspec.licenses.empty?
+            licenses.concat(gemspec.licenses)
+          end
           licenses.uniq!
         end
         licenses
