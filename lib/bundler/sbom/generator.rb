@@ -51,8 +51,6 @@ module Bundler
         end
       end
 
-      private
-
       def self.get_gems_for_groups(lockfile, without_groups)
         # If no groups specified, use all specs
         if without_groups.empty?
@@ -88,6 +86,7 @@ module Bundler
           lockfile.specs
         end
       end
+      private_class_method :get_gems_for_groups
     end
   end
 end
