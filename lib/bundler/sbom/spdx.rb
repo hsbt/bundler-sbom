@@ -27,22 +27,8 @@ module Bundler
           gem_key = "#{spec.name}:#{spec.version}"
           next if seen_gems.include?(gem_key)
           seen_gems.add(gem_key)
-          begin
-            gemspec = Gem::Specification.find_by_name(spec.name, spec.version)
-            licenses = []
-            if gemspec
-              if gemspec.license && !gemspec.license.empty?
-                licenses << gemspec.license
-              end
-              if gemspec.licenses && !gemspec.licenses.empty?
-                licenses.concat(gemspec.licenses)
-              end
-              licenses.uniq!
-            end
-            license_string = licenses.empty? ? "NOASSERTION" : licenses.join(", ")
-          rescue Gem::LoadError
-            license_string = "NOASSERTION"
-          end
+          licenses = find_licenses(spec)
+          license_string = licenses.empty? ? "NOASSERTION" : licenses.join(", ")
 
           package = {
             "SPDXID" => "SPDXRef-Package-#{spec.name}",
@@ -206,6 +192,22 @@ module Bundler
             }
           end
         }
+      end
+
+      def self.find_licenses(spec)
+        gemspec = spec.__materialize__ if spec.respond_to?(:__materialize__)
+        begin
+          gemspec ||= Gem::Specification.find_by_name(spec.name, spec.version)
+        rescue Gem::LoadError
+          # ignore
+        end
+
+        licenses = []
+        if gemspec
+          licenses.concat(gemspec.licenses) if gemspec.respond_to?(:licenses) && gemspec.licenses && !gemspec.licenses.empty?
+          licenses.uniq!
+        end
+        licenses
       end
 
       def self.generate_spdx_id
