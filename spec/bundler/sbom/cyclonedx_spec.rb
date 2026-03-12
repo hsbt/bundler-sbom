@@ -44,19 +44,20 @@ RSpec.describe Bundler::Sbom::CycloneDX do
   end
 
   describe ".generate" do
-    it "generates CycloneDX SBOM document" do
+    it "generates CycloneDX SBOM instance" do
       sbom = described_class.generate([], "test-project")
-      expect(sbom["bomFormat"]).to eq("CycloneDX")
-      expect(sbom["specVersion"]).to eq("1.4")
-      expect(sbom["serialNumber"]).to match(/^urn:uuid:[0-9a-f-]+$/)
-      expect(sbom["components"]).to be_an(Array)
+      expect(sbom).to be_a(described_class)
+      expect(sbom.to_hash["bomFormat"]).to eq("CycloneDX")
+      expect(sbom.to_hash["specVersion"]).to eq("1.4")
+      expect(sbom.to_hash["serialNumber"]).to match(/^urn:uuid:[0-9a-f-]+$/)
+      expect(sbom.to_hash["components"]).to be_an(Array)
     end
 
     it "includes component information" do
       gem_data = [{name: "rake", version: "13.0.6", licenses: ["MIT"]}]
       sbom = described_class.generate(gem_data, "test-project")
 
-      component = sbom["components"].find { |c| c["name"] == "rake" }
+      component = sbom.to_hash["components"].find { |c| c["name"] == "rake" }
       expect(component).not_to be_nil
       expect(component["name"]).to eq("rake")
       expect(component["version"]).to eq("13.0.6")
@@ -70,7 +71,7 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       gem_data = [{name: "bundler", version: "2.4.0", licenses: ["MIT", "Apache-2.0"]}]
       sbom = described_class.generate(gem_data, "test-project")
 
-      component = sbom["components"].find { |c| c["name"] == "bundler" }
+      component = sbom.to_hash["components"].find { |c| c["name"] == "bundler" }
       expect(component).not_to be_nil
       expect(component["licenses"].size).to eq(2)
       license_ids = component["licenses"].map { |l| l["license"]["id"] }
@@ -82,7 +83,7 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       gem_data = [{name: "no-license", version: "1.0.0", licenses: []}]
       sbom = described_class.generate(gem_data, "test-project")
 
-      component = sbom["components"].find { |c| c["name"] == "no-license" }
+      component = sbom.to_hash["components"].find { |c| c["name"] == "no-license" }
       expect(component).not_to be_nil
       expect(component["licenses"]).to be_nil
     end
@@ -90,14 +91,14 @@ RSpec.describe Bundler::Sbom::CycloneDX do
     it "includes metadata with timestamp and tools" do
       sbom = described_class.generate([], "test-project")
 
-      expect(sbom["metadata"]).to be_a(Hash)
-      expect(sbom["metadata"]["timestamp"]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/)
-      expect(sbom["metadata"]["tools"]).to be_an(Array)
-      expect(sbom["metadata"]["tools"].first["name"]).to eq("bundle-sbom")
+      expect(sbom.to_hash["metadata"]).to be_a(Hash)
+      expect(sbom.to_hash["metadata"]["timestamp"]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/)
+      expect(sbom.to_hash["metadata"]["tools"]).to be_an(Array)
+      expect(sbom.to_hash["metadata"]["tools"].first["name"]).to eq("bundle-sbom")
     end
   end
 
-  describe ".to_xml" do
+  describe "#to_xml" do
     let(:cyclonedx_hash) do
       {
         "bomFormat" => "CycloneDX",
@@ -155,12 +156,12 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       }
     end
 
-    it "converts CycloneDX SBOM hash to XML format" do
-      xml_content = described_class.to_xml(cyclonedx_hash)
+    it "converts CycloneDX SBOM instance to XML format" do
+      sbom = described_class.new(cyclonedx_hash)
+      xml_content = sbom.to_xml
       expect(xml_content).to be_a(String)
       expect(xml_content).to include('<?xml version="1.0" encoding="UTF-8"?>')
 
-      # Parse XML to verify structure
       doc = REXML::Document.new(xml_content)
       root = doc.root
 
@@ -168,44 +169,37 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       expect(root.namespace).to include("cyclonedx.org/schema")
       expect(root.attributes["serialNumber"]).to eq("urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79")
 
-      # Check metadata
       metadata = REXML::XPath.first(root, "metadata")
       expect(metadata).not_to be_nil
       expect(REXML::XPath.first(metadata, "timestamp").text).to eq("2023-01-01T12:00:00Z")
 
-      # Check tools
       tools = REXML::XPath.first(metadata, "tools")
       expect(tools).not_to be_nil
       tool = REXML::XPath.first(tools, "tool")
       expect(tool).not_to be_nil
       expect(REXML::XPath.first(tool, "name").text).to eq("bundle-sbom")
 
-      # Check components
       components = REXML::XPath.first(root, "components")
       expect(components).not_to be_nil
       comps = REXML::XPath.each(components, "component").to_a
       expect(comps.size).to eq(2)
 
-      # Check first component
       comp1 = comps[0]
       expect(comp1.attributes["type"]).to eq("library")
       expect(REXML::XPath.first(comp1, "name").text).to eq("rake")
       expect(REXML::XPath.first(comp1, "version").text).to eq("13.0.6")
       expect(REXML::XPath.first(comp1, "purl").text).to eq("pkg:gem/rake@13.0.6")
 
-      # Check license in first component
       licenses1 = REXML::XPath.first(comp1, "licenses")
       expect(licenses1).not_to be_nil
       license1 = REXML::XPath.first(licenses1, "license")
       expect(license1).not_to be_nil
       expect(REXML::XPath.first(license1, "id").text).to eq("MIT")
 
-      # Check second component with multiple licenses
       comp2 = comps[1]
       expect(comp2.attributes["type"]).to eq("library")
       expect(REXML::XPath.first(comp2, "name").text).to eq("bundler")
 
-      # Check licenses in second component
       licenses2 = REXML::XPath.first(comp2, "licenses")
       expect(licenses2).not_to be_nil
       license_nodes = REXML::XPath.each(licenses2, "license").to_a
@@ -264,24 +258,21 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       XML
     end
 
-    it "parses CycloneDX XML content" do
+    it "parses CycloneDX XML content into instance" do
       doc = REXML::Document.new(cyclonedx_xml_content)
       sbom = described_class.parse_xml(doc)
 
-      # The result should be raw CycloneDX format
-      expect(sbom).to be_a(Hash)
-      expect(sbom["bomFormat"]).to eq("CycloneDX")
-      expect(sbom["components"]).to be_an(Array)
-      expect(sbom["components"].size).to eq(2)
+      expect(sbom).to be_a(described_class)
+      expect(sbom.to_hash["bomFormat"]).to eq("CycloneDX")
+      expect(sbom.to_hash["components"]).to be_an(Array)
+      expect(sbom.to_hash["components"].size).to eq(2)
 
-      # Check first component
-      rake_comp = sbom["components"].find { |c| c["name"] == "rake" }
+      rake_comp = sbom.to_hash["components"].find { |c| c["name"] == "rake" }
       expect(rake_comp).not_to be_nil
       expect(rake_comp["version"]).to eq("13.0.6")
       expect(rake_comp["licenses"]).to eq([{"license" => {"id" => "MIT"}}])
 
-      # Check second component with multiple licenses
-      bundler_comp = sbom["components"].find { |c| c["name"] == "bundler" }
+      bundler_comp = sbom.to_hash["components"].find { |c| c["name"] == "bundler" }
       expect(bundler_comp).not_to be_nil
       expect(bundler_comp["version"]).to eq("2.4.0")
       expect(bundler_comp["licenses"]).to eq([{"license" => {"id" => "MIT"}}, {"license" => {"id" => "Apache-2.0"}}])

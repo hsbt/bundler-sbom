@@ -27,7 +27,8 @@ module Bundler
         end
 
         # Generate SBOM based on specified format
-        sbom = Bundler::Sbom::Generator.generate_sbom(sbom_format, without_groups: without_groups)
+        generator = Bundler::Sbom::Generator.new(format: sbom_format, without_groups: without_groups)
+        sbom = generator.generate
 
         # Determine file extension based on output format
         ext = (format == "json") ? "json" : "xml"
@@ -37,10 +38,9 @@ module Bundler
         output_file = "#{prefix}.#{ext}"
 
         if format == "json"
-          File.write(output_file, JSON.pretty_generate(sbom))
+          File.write(output_file, JSON.pretty_generate(sbom.to_hash))
         else # xml
-          xml_content = Bundler::Sbom::Generator.convert_to_xml(sbom)
-          File.write(output_file, xml_content)
+          File.write(output_file, sbom.to_xml)
         end
 
         Bundler.ui.info("Generated #{sbom_format.upcase} SBOM at #{output_file}")
@@ -85,10 +85,10 @@ module Bundler
           sbom = if format == "xml" || (!format && File.extname(input_file) == ".xml")
             Bundler::Sbom::Generator.parse_xml(content)
           else
-            JSON.parse(content)
+            Bundler::Sbom::Generator.from_hash(JSON.parse(content))
           end
 
-          Bundler::Sbom::Reporter.display_license_report(sbom)
+          Bundler::Sbom::Reporter.new(sbom).display_license_report
         rescue JSON::ParserError
           Bundler.ui.error("Error: #{input_file} is not a valid JSON file")
           exit 1
@@ -98,7 +98,6 @@ module Bundler
         end
       end
 
-      # 適切にエラーで終了することを保証するためのメソッド
       def self.exit_on_failure?
         true
       end
@@ -108,7 +107,6 @@ module Bundler
       def parse_without_groups(without_option)
         return [] unless without_option
 
-        # Split by comma or colon and clean up whitespace
         groups = without_option.split(%r{[:,]}).map(&:strip).reject(&:empty?)
         groups.map(&:to_sym)
       end

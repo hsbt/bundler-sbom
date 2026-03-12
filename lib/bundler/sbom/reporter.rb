@@ -1,29 +1,23 @@
 module Bundler
   module Sbom
     class Reporter
-      def self.display_license_report(sbom)
-        # フォーマットに応じて適切な形式に変換
-        sbom = if sbom_format(sbom) == :cyclonedx
-          CycloneDX.to_report_format(sbom)
-        else
-          SPDX.to_report_format(sbom)
-        end
-
-        display_report(sbom)
+      def initialize(sbom)
+        @sbom = sbom
       end
 
-      def self.sbom_format(sbom)
-        return :cyclonedx if sbom["bomFormat"] == "CycloneDX"
-        :spdx
+      def display_license_report
+        report = @sbom.to_report_format
+        display_report(report)
       end
-      private_class_method :sbom_format
 
-      def self.display_report(sbom)
-        license_count = analyze_licenses(sbom)
+      private
+
+      def display_report(report)
+        license_count = analyze_licenses(report)
         sorted_licenses = license_count.sort_by { |_, count| -count }
 
         Bundler.ui.info "=== License Usage in SBOM ==="
-        Bundler.ui.info "Total packages: #{sbom["packages"].size}"
+        Bundler.ui.info "Total packages: #{report["packages"].size}"
         Bundler.ui.info ""
 
         sorted_licenses.each do |license, count|
@@ -32,7 +26,7 @@ module Bundler
 
         Bundler.ui.info "\n=== Packages by License ==="
         sorted_licenses.each do |license, _|
-          packages = sbom["packages"].select do |package|
+          packages = report["packages"].select do |package|
             if package["licenseDeclared"].include?(",")
               package["licenseDeclared"].split(",").map(&:strip).include?(license)
             else
@@ -47,9 +41,9 @@ module Bundler
         end
       end
 
-      def self.analyze_licenses(sbom)
+      def analyze_licenses(report)
         license_count = Hash.new(0)
-        sbom["packages"].each do |package|
+        report["packages"].each do |package|
           licenses = package["licenseDeclared"].split(",").map(&:strip)
           licenses.each do |license|
             license_count[license] += 1
@@ -57,7 +51,6 @@ module Bundler
         end
         license_count
       end
-      private_class_method :display_report, :analyze_licenses
     end
   end
 end

@@ -5,8 +5,14 @@ require "rexml/document"
 module Bundler
   module Sbom
     class SPDX
+      attr_reader :data
+
+      def initialize(data)
+        @data = data
+      end
+
       def self.generate(gem_data, document_name)
-        spdx_id = generate_spdx_id
+        spdx_id = SecureRandom.uuid
         sbom = {
           "SPDXID" => "SPDXRef-DOCUMENT",
           "spdxVersion" => "SPDX-2.3",
@@ -46,73 +52,7 @@ module Bundler
         end
 
         sbom["documentDescribes"] = sbom["packages"].map { |p| p["SPDXID"] }
-        sbom
-      end
-
-      def self.to_xml(sbom)
-        doc = REXML::Document.new
-        doc << REXML::XMLDecl.new("1.0", "UTF-8")
-
-        # Root element
-        root = REXML::Element.new("SpdxDocument")
-        root.add_namespace("https://spdx.org/spdxdocs/")
-        doc.add_element(root)
-
-        # Document info
-        add_element(root, "SPDXID", sbom["SPDXID"])
-        add_element(root, "spdxVersion", sbom["spdxVersion"])
-        add_element(root, "name", sbom["name"])
-        add_element(root, "dataLicense", sbom["dataLicense"])
-        add_element(root, "documentNamespace", sbom["documentNamespace"])
-
-        # Creation info
-        creation_info = REXML::Element.new("creationInfo")
-        root.add_element(creation_info)
-        add_element(creation_info, "created", sbom["creationInfo"]["created"])
-        add_element(creation_info, "licenseListVersion", sbom["creationInfo"]["licenseListVersion"])
-
-        sbom["creationInfo"]["creators"].each do |creator|
-          add_element(creation_info, "creator", creator)
-        end
-
-        # Describes
-        sbom["documentDescribes"].each do |describes|
-          add_element(root, "documentDescribes", describes)
-        end
-
-        # Packages
-        sbom["packages"].each do |pkg|
-          package = REXML::Element.new("package")
-          root.add_element(package)
-
-          add_element(package, "SPDXID", pkg["SPDXID"])
-          add_element(package, "name", pkg["name"])
-          add_element(package, "versionInfo", pkg["versionInfo"])
-          add_element(package, "downloadLocation", pkg["downloadLocation"])
-          add_element(package, "filesAnalyzed", pkg["filesAnalyzed"].to_s)
-          add_element(package, "licenseConcluded", pkg["licenseConcluded"])
-          add_element(package, "licenseDeclared", pkg["licenseDeclared"])
-          add_element(package, "copyrightText", pkg["copyrightText"])
-          add_element(package, "supplier", pkg["supplier"])
-
-          # External references
-          if pkg["externalRefs"]
-            pkg["externalRefs"].each do |ref|
-              ext_ref = REXML::Element.new("externalRef")
-              package.add_element(ext_ref)
-
-              add_element(ext_ref, "referenceCategory", ref["referenceCategory"])
-              add_element(ext_ref, "referenceType", ref["referenceType"])
-              add_element(ext_ref, "referenceLocator", ref["referenceLocator"])
-            end
-          end
-        end
-
-        formatter = REXML::Formatters::Pretty.new(2)
-        formatter.compact = true
-        output = ""
-        formatter.write(doc, output)
-        output.sub(%r{<\?xml version='1\.0' encoding='UTF-8'\?>}, '<?xml version="1.0" encoding="UTF-8"?>')
+        new(sbom)
       end
 
       def self.parse_xml(doc)
@@ -133,17 +73,14 @@ module Bundler
           "documentDescribes" => []
         }
 
-        # Collect creators
         REXML::XPath.each(root, "creationInfo/creator") do |creator|
           sbom["creationInfo"]["creators"] << creator.text
         end
 
-        # Collect documentDescribes
         REXML::XPath.each(root, "documentDescribes") do |describes|
           sbom["documentDescribes"] << describes.text
         end
 
-        # Collect packages
         REXML::XPath.each(root, "package") do |pkg_element|
           package = {
             "SPDXID" => get_element_text(pkg_element, "SPDXID"),
@@ -158,7 +95,6 @@ module Bundler
             "externalRefs" => []
           }
 
-          # Collect external references
           REXML::XPath.each(pkg_element, "externalRef") do |ref_element|
             ref = {
               "referenceCategory" => get_element_text(ref_element, "referenceCategory"),
@@ -171,14 +107,76 @@ module Bundler
           sbom["packages"] << package
         end
 
-        sbom
+        new(sbom)
       end
 
-      def self.to_report_format(sbom)
-        # SPDXフォーマットは既にレポート形式と互換性があるため、
-        # packagesセクションだけを抽出して返す
+      def to_hash
+        @data
+      end
+
+      def to_xml
+        doc = REXML::Document.new
+        doc << REXML::XMLDecl.new("1.0", "UTF-8")
+
+        root = REXML::Element.new("SpdxDocument")
+        root.add_namespace("https://spdx.org/spdxdocs/")
+        doc.add_element(root)
+
+        add_element(root, "SPDXID", @data["SPDXID"])
+        add_element(root, "spdxVersion", @data["spdxVersion"])
+        add_element(root, "name", @data["name"])
+        add_element(root, "dataLicense", @data["dataLicense"])
+        add_element(root, "documentNamespace", @data["documentNamespace"])
+
+        creation_info = REXML::Element.new("creationInfo")
+        root.add_element(creation_info)
+        add_element(creation_info, "created", @data["creationInfo"]["created"])
+        add_element(creation_info, "licenseListVersion", @data["creationInfo"]["licenseListVersion"])
+
+        @data["creationInfo"]["creators"].each do |creator|
+          add_element(creation_info, "creator", creator)
+        end
+
+        @data["documentDescribes"].each do |describes|
+          add_element(root, "documentDescribes", describes)
+        end
+
+        @data["packages"].each do |pkg|
+          package = REXML::Element.new("package")
+          root.add_element(package)
+
+          add_element(package, "SPDXID", pkg["SPDXID"])
+          add_element(package, "name", pkg["name"])
+          add_element(package, "versionInfo", pkg["versionInfo"])
+          add_element(package, "downloadLocation", pkg["downloadLocation"])
+          add_element(package, "filesAnalyzed", pkg["filesAnalyzed"].to_s)
+          add_element(package, "licenseConcluded", pkg["licenseConcluded"])
+          add_element(package, "licenseDeclared", pkg["licenseDeclared"])
+          add_element(package, "copyrightText", pkg["copyrightText"])
+          add_element(package, "supplier", pkg["supplier"])
+
+          if pkg["externalRefs"]
+            pkg["externalRefs"].each do |ref|
+              ext_ref = REXML::Element.new("externalRef")
+              package.add_element(ext_ref)
+
+              add_element(ext_ref, "referenceCategory", ref["referenceCategory"])
+              add_element(ext_ref, "referenceType", ref["referenceType"])
+              add_element(ext_ref, "referenceLocator", ref["referenceLocator"])
+            end
+          end
+        end
+
+        formatter = REXML::Formatters::Pretty.new(2)
+        formatter.compact = true
+        output = ""
+        formatter.write(doc, output)
+        output.sub(%r{<\?xml version='1\.0' encoding='UTF-8'\?>}, '<?xml version="1.0" encoding="UTF-8"?>')
+      end
+
+      def to_report_format
         {
-          "packages" => sbom["packages"].map do |pkg|
+          "packages" => @data["packages"].map do |pkg|
             {
               "name" => pkg["name"],
               "versionInfo" => pkg["versionInfo"],
@@ -188,17 +186,13 @@ module Bundler
         }
       end
 
-      def self.generate_spdx_id
-        SecureRandom.uuid
-      end
-      private_class_method :generate_spdx_id
+      private
 
-      def self.add_element(parent, name, value)
+      def add_element(parent, name, value)
         element = REXML::Element.new(name)
         element.text = value
         parent.add_element(element)
       end
-      private_class_method :add_element
 
       def self.get_element_text(element, xpath)
         result = REXML::XPath.first(element, xpath)

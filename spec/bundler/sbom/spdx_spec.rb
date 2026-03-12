@@ -44,18 +44,19 @@ RSpec.describe Bundler::Sbom::SPDX do
   end
 
   describe ".generate" do
-    it "generates SBOM document" do
+    it "generates SBOM instance" do
       sbom = described_class.generate([], "test-project")
-      expect(sbom["SPDXID"]).to eq("SPDXRef-DOCUMENT")
-      expect(sbom["spdxVersion"]).to eq("SPDX-2.3")
-      expect(sbom["packages"]).to be_an(Array)
+      expect(sbom).to be_a(described_class)
+      expect(sbom.to_hash["SPDXID"]).to eq("SPDXRef-DOCUMENT")
+      expect(sbom.to_hash["spdxVersion"]).to eq("SPDX-2.3")
+      expect(sbom.to_hash["packages"]).to be_an(Array)
     end
 
     it "includes package information" do
       gem_data = [{name: "rake", version: "13.0.6", licenses: ["MIT"]}]
       sbom = described_class.generate(gem_data, "test-project")
 
-      package = sbom["packages"].find { |p| p["name"] == "rake" }
+      package = sbom.to_hash["packages"].find { |p| p["name"] == "rake" }
       expect(package).not_to be_nil
       expect(package["name"]).to eq("rake")
       expect(package["versionInfo"]).to eq("13.0.6")
@@ -66,7 +67,7 @@ RSpec.describe Bundler::Sbom::SPDX do
       gem_data = [{name: "bundler", version: "2.4.0", licenses: ["MIT", "Apache-2.0"]}]
       sbom = described_class.generate(gem_data, "test-project")
 
-      package = sbom["packages"].find { |p| p["name"] == "bundler" }
+      package = sbom.to_hash["packages"].find { |p| p["name"] == "bundler" }
       expect(package).not_to be_nil
       expect(package["licenseDeclared"]).to eq("MIT, Apache-2.0")
     end
@@ -75,13 +76,13 @@ RSpec.describe Bundler::Sbom::SPDX do
       gem_data = [{name: "no-license", version: "1.0.0", licenses: []}]
       sbom = described_class.generate(gem_data, "test-project")
 
-      package = sbom["packages"].find { |p| p["name"] == "no-license" }
+      package = sbom.to_hash["packages"].find { |p| p["name"] == "no-license" }
       expect(package).not_to be_nil
       expect(package["licenseDeclared"]).to eq("NOASSERTION")
     end
   end
 
-  describe ".to_xml" do
+  describe "#to_xml" do
     let(:sbom_hash) do
       {
         "SPDXID" => "SPDXRef-DOCUMENT",
@@ -118,12 +119,12 @@ RSpec.describe Bundler::Sbom::SPDX do
       }
     end
 
-    it "converts SBOM hash to XML format" do
-      xml_content = described_class.to_xml(sbom_hash)
+    it "converts SBOM instance to XML format" do
+      sbom = described_class.new(sbom_hash)
+      xml_content = sbom.to_xml
       expect(xml_content).to be_a(String)
       expect(xml_content).to include('<?xml version="1.0" encoding="UTF-8"?>')
 
-      # Parse XML to verify structure
       doc = REXML::Document.new(xml_content)
       root = doc.root
 
@@ -132,14 +133,12 @@ RSpec.describe Bundler::Sbom::SPDX do
       expect(REXML::XPath.first(root, "spdxVersion").text).to eq("SPDX-2.3")
       expect(REXML::XPath.first(root, "name").text).to eq("test-project")
 
-      # Check package information
       package = REXML::XPath.first(root, "package")
       expect(package).not_to be_nil
       expect(REXML::XPath.first(package, "name").text).to eq("rake")
       expect(REXML::XPath.first(package, "versionInfo").text).to eq("13.0.6")
       expect(REXML::XPath.first(package, "licenseDeclared").text).to eq("MIT")
 
-      # Check external reference
       ext_ref = REXML::XPath.first(package, "externalRef")
       expect(ext_ref).not_to be_nil
       expect(REXML::XPath.first(ext_ref, "referenceLocator").text).to eq("pkg:gem/rake@13.0.6")
@@ -182,32 +181,29 @@ RSpec.describe Bundler::Sbom::SPDX do
       XML
     end
 
-    it "parses XML content into SBOM hash" do
+    it "parses XML content into SBOM instance" do
       doc = REXML::Document.new(xml_content)
       sbom = described_class.parse_xml(doc)
 
-      expect(sbom).to be_a(Hash)
-      expect(sbom["SPDXID"]).to eq("SPDXRef-DOCUMENT")
-      expect(sbom["spdxVersion"]).to eq("SPDX-2.3")
-      expect(sbom["name"]).to eq("test-project")
-      expect(sbom["dataLicense"]).to eq("CC0-1.0")
+      expect(sbom).to be_a(described_class)
+      expect(sbom.to_hash["SPDXID"]).to eq("SPDXRef-DOCUMENT")
+      expect(sbom.to_hash["spdxVersion"]).to eq("SPDX-2.3")
+      expect(sbom.to_hash["name"]).to eq("test-project")
+      expect(sbom.to_hash["dataLicense"]).to eq("CC0-1.0")
 
-      # Check creation info
-      expect(sbom["creationInfo"]).to be_a(Hash)
-      expect(sbom["creationInfo"]["created"]).to eq("2023-01-01T12:00:00Z")
-      expect(sbom["creationInfo"]["creators"]).to include("Tool: bundle-sbom")
+      expect(sbom.to_hash["creationInfo"]).to be_a(Hash)
+      expect(sbom.to_hash["creationInfo"]["created"]).to eq("2023-01-01T12:00:00Z")
+      expect(sbom.to_hash["creationInfo"]["creators"]).to include("Tool: bundle-sbom")
 
-      # Check packages
-      expect(sbom["packages"]).to be_an(Array)
-      expect(sbom["packages"].size).to eq(1)
+      expect(sbom.to_hash["packages"]).to be_an(Array)
+      expect(sbom.to_hash["packages"].size).to eq(1)
 
-      package = sbom["packages"].first
+      package = sbom.to_hash["packages"].first
       expect(package["SPDXID"]).to eq("SPDXRef-Package-rake")
       expect(package["name"]).to eq("rake")
       expect(package["versionInfo"]).to eq("13.0.6")
       expect(package["licenseDeclared"]).to eq("MIT")
 
-      # Check external refs
       expect(package["externalRefs"]).to be_an(Array)
       expect(package["externalRefs"].size).to eq(1)
 

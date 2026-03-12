@@ -5,6 +5,12 @@ require "rexml/document"
 module Bundler
   module Sbom
     class CycloneDX
+      attr_reader :data
+
+      def initialize(data)
+        @data = data
+      end
+
       def self.generate(gem_data, document_name)
         serial_number = SecureRandom.uuid
         timestamp = Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -25,7 +31,7 @@ module Bundler
             "component" => {
               "type" => "application",
               "name" => document_name,
-              "version" => "0.0.0" # Default version
+              "version" => "0.0.0"
             }
           },
           "components" => []
@@ -46,83 +52,7 @@ module Bundler
           sbom["components"] << component
         end
 
-        sbom
-      end
-
-      def self.to_xml(sbom)
-        doc = REXML::Document.new
-        doc << REXML::XMLDecl.new("1.0", "UTF-8")
-
-        # Root element
-        root = REXML::Element.new("bom")
-        root.add_namespace("http://cyclonedx.org/schema/bom/1.4")
-        root.add_attributes({
-          "serialNumber" => sbom["serialNumber"],
-          "version" => sbom["version"].to_s
-        })
-        doc.add_element(root)
-
-        # Metadata
-        metadata = REXML::Element.new("metadata")
-        root.add_element(metadata)
-
-        add_element(metadata, "timestamp", sbom["metadata"]["timestamp"])
-
-        # Tools
-        tools = REXML::Element.new("tools")
-        metadata.add_element(tools)
-
-        sbom["metadata"]["tools"].each do |tool_data|
-          tool = REXML::Element.new("tool")
-          tools.add_element(tool)
-
-          add_element(tool, "vendor", tool_data["vendor"])
-          add_element(tool, "name", tool_data["name"])
-          add_element(tool, "version", tool_data["version"].to_s)
-        end
-
-        # Component (root project)
-        component = REXML::Element.new("component")
-        component.add_attribute("type", sbom["metadata"]["component"]["type"])
-        metadata.add_element(component)
-
-        add_element(component, "name", sbom["metadata"]["component"]["name"])
-        add_element(component, "version", sbom["metadata"]["component"]["version"])
-
-        # Components
-        components = REXML::Element.new("components")
-        root.add_element(components)
-
-        sbom["components"].each do |comp_data|
-          comp = REXML::Element.new("component")
-          comp.add_attribute("type", comp_data["type"])
-          components.add_element(comp)
-
-          add_element(comp, "name", comp_data["name"])
-          add_element(comp, "version", comp_data["version"])
-          add_element(comp, "purl", comp_data["purl"])
-
-          # Licenses
-          if comp_data["licenses"] && !comp_data["licenses"].empty?
-            licenses = REXML::Element.new("licenses")
-            comp.add_element(licenses)
-
-            comp_data["licenses"].each do |license_data|
-              license = REXML::Element.new("license")
-              licenses.add_element(license)
-
-              if license_data["license"]["id"]
-                add_element(license, "id", license_data["license"]["id"])
-              end
-            end
-          end
-        end
-
-        formatter = REXML::Formatters::Pretty.new(2)
-        formatter.compact = true
-        output = ""
-        formatter.write(doc, output)
-        output.sub(%r{<\?xml version='1\.0' encoding='UTF-8'\?>}, '<?xml version="1.0" encoding="UTF-8"?>')
+        new(sbom)
       end
 
       def self.parse_xml(doc)
@@ -145,7 +75,6 @@ module Bundler
           "components" => []
         }
 
-        # Collect tools
         REXML::XPath.each(root, "metadata/tools/tool") do |tool|
           tool_data = {
             "vendor" => get_element_text(tool, "vendor"),
@@ -155,7 +84,6 @@ module Bundler
           sbom["metadata"]["tools"] << tool_data
         end
 
-        # Collect components
         REXML::XPath.each(root, "components/component") do |comp|
           component = {
             "type" => comp.attributes["type"],
@@ -164,7 +92,6 @@ module Bundler
             "purl" => get_element_text(comp, "purl")
           }
 
-          # Collect licenses
           licenses = []
           REXML::XPath.each(comp, "licenses/license") do |license|
             license_id = get_element_text(license, "id")
@@ -175,12 +102,86 @@ module Bundler
           sbom["components"] << component
         end
 
-        sbom
+        new(sbom)
       end
 
-      def self.to_report_format(sbom)
+      def to_hash
+        @data
+      end
+
+      def to_xml
+        doc = REXML::Document.new
+        doc << REXML::XMLDecl.new("1.0", "UTF-8")
+
+        root = REXML::Element.new("bom")
+        root.add_namespace("http://cyclonedx.org/schema/bom/1.4")
+        root.add_attributes({
+          "serialNumber" => @data["serialNumber"],
+          "version" => @data["version"].to_s
+        })
+        doc.add_element(root)
+
+        metadata = REXML::Element.new("metadata")
+        root.add_element(metadata)
+
+        add_element(metadata, "timestamp", @data["metadata"]["timestamp"])
+
+        tools = REXML::Element.new("tools")
+        metadata.add_element(tools)
+
+        @data["metadata"]["tools"].each do |tool_data|
+          tool = REXML::Element.new("tool")
+          tools.add_element(tool)
+
+          add_element(tool, "vendor", tool_data["vendor"])
+          add_element(tool, "name", tool_data["name"])
+          add_element(tool, "version", tool_data["version"].to_s)
+        end
+
+        component = REXML::Element.new("component")
+        component.add_attribute("type", @data["metadata"]["component"]["type"])
+        metadata.add_element(component)
+
+        add_element(component, "name", @data["metadata"]["component"]["name"])
+        add_element(component, "version", @data["metadata"]["component"]["version"])
+
+        components = REXML::Element.new("components")
+        root.add_element(components)
+
+        @data["components"].each do |comp_data|
+          comp = REXML::Element.new("component")
+          comp.add_attribute("type", comp_data["type"])
+          components.add_element(comp)
+
+          add_element(comp, "name", comp_data["name"])
+          add_element(comp, "version", comp_data["version"])
+          add_element(comp, "purl", comp_data["purl"])
+
+          if comp_data["licenses"] && !comp_data["licenses"].empty?
+            licenses = REXML::Element.new("licenses")
+            comp.add_element(licenses)
+
+            comp_data["licenses"].each do |license_data|
+              license = REXML::Element.new("license")
+              licenses.add_element(license)
+
+              if license_data["license"]["id"]
+                add_element(license, "id", license_data["license"]["id"])
+              end
+            end
+          end
+        end
+
+        formatter = REXML::Formatters::Pretty.new(2)
+        formatter.compact = true
+        output = ""
+        formatter.write(doc, output)
+        output.sub(%r{<\?xml version='1\.0' encoding='UTF-8'\?>}, '<?xml version="1.0" encoding="UTF-8"?>')
+      end
+
+      def to_report_format
         {
-          "packages" => sbom["components"].map do |comp|
+          "packages" => @data["components"].map do |comp|
             license_string = if comp["licenses"]
               comp["licenses"].map { |l| l["license"]["id"] }.join(", ")
             else
@@ -195,12 +196,13 @@ module Bundler
         }
       end
 
-      def self.add_element(parent, name, value)
+      private
+
+      def add_element(parent, name, value)
         element = REXML::Element.new(name)
         element.text = value
         parent.add_element(element)
       end
-      private_class_method :add_element
 
       def self.get_element_text(element, xpath)
         result = REXML::XPath.first(element, xpath)
