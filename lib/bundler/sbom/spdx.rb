@@ -5,7 +5,7 @@ require "rexml/document"
 module Bundler
   module Sbom
     class SPDX
-      def self.generate(gems, document_name)
+      def self.generate(gem_data, document_name)
         spdx_id = generate_spdx_id
         sbom = {
           "SPDXID" => "SPDXRef-DOCUMENT",
@@ -21,19 +21,13 @@ module Bundler
           "packages" => []
         }
 
-        # Deduplicate specs by name and version
-        seen_gems = Set.new
-        gems.each do |spec|
-          gem_key = "#{spec.name}:#{spec.version}"
-          next if seen_gems.include?(gem_key)
-          seen_gems.add(gem_key)
-          licenses = SpecLicenseFinder.find_licenses(spec)
-          license_string = licenses.empty? ? "NOASSERTION" : licenses.join(", ")
+        gem_data.each do |gem|
+          license_string = gem[:licenses].empty? ? "NOASSERTION" : gem[:licenses].join(", ")
 
           package = {
-            "SPDXID" => "SPDXRef-Package-#{spec.name}",
-            "name" => spec.name,
-            "versionInfo" => spec.version.to_s,
+            "SPDXID" => "SPDXRef-Package-#{gem[:name]}",
+            "name" => gem[:name],
+            "versionInfo" => gem[:version],
             "downloadLocation" => "NOASSERTION",
             "filesAnalyzed" => false,
             "licenseConcluded" => license_string,
@@ -44,7 +38,7 @@ module Bundler
               {
                 "referenceCategory" => "PACKAGE_MANAGER",
                 "referenceType" => "purl",
-                "referenceLocator" => "pkg:gem/#{spec.name}@#{spec.version}"
+                "referenceLocator" => "pkg:gem/#{gem[:name]}@#{gem[:version]}"
               }
             ]
           }

@@ -5,7 +5,7 @@ require "rexml/document"
 module Bundler
   module Sbom
     class CycloneDX
-      def self.generate(gems, document_name)
+      def self.generate(gem_data, document_name)
         serial_number = SecureRandom.uuid
         timestamp = Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
         sbom = {
@@ -31,23 +31,16 @@ module Bundler
           "components" => []
         }
 
-        # Deduplicate specs by name and version
-        seen_gems = Set.new
-        gems.each do |spec|
-          gem_key = "#{spec.name}:#{spec.version}"
-          next if seen_gems.include?(gem_key)
-          seen_gems.add(gem_key)
-          licenses = SpecLicenseFinder.find_licenses(spec)
-
+        gem_data.each do |gem|
           component = {
             "type" => "library",
-            "name" => spec.name,
-            "version" => spec.version.to_s,
-            "purl" => "pkg:gem/#{spec.name}@#{spec.version}"
+            "name" => gem[:name],
+            "version" => gem[:version],
+            "purl" => "pkg:gem/#{gem[:name]}@#{gem[:version]}"
           }
 
-          unless licenses.empty?
-            component["licenses"] = licenses.map { |license| {"license" => {"id" => license}} }
+          unless gem[:licenses].empty?
+            component["licenses"] = gem[:licenses].map { |license| {"license" => {"id" => license}} }
           end
 
           sbom["components"] << component

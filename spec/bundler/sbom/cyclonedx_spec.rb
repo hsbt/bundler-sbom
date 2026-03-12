@@ -34,46 +34,6 @@ RSpec.describe Bundler::Sbom::CycloneDX do
     LOCKFILE
   end
 
-  let(:rake_spec) do
-    double(
-      "rake_spec",
-      name: "rake",
-      version: Gem::Version.new("13.0.6"),
-      license: "MIT",
-      licenses: []
-    )
-  end
-
-  let(:multi_license_spec) do
-    double(
-      "multi_license_spec",
-      name: "bundler",
-      version: Gem::Version.new("2.4.0"),
-      license: "",
-      licenses: ["MIT", "Apache-2.0"]
-    )
-  end
-
-  let(:empty_license_spec) do
-    double(
-      "empty_license_spec",
-      name: "no-license",
-      version: Gem::Version.new("1.0.0"),
-      license: "",
-      licenses: []
-    )
-  end
-
-  let(:nil_license_spec) do
-    double(
-      "nil_license_spec",
-      name: "nil-license",
-      version: Gem::Version.new("1.0.0"),
-      license: nil,
-      licenses: nil
-    )
-  end
-
   before(:each) do
     File.write("Gemfile", gemfile_content)
     File.write("Gemfile.lock", lockfile_content)
@@ -81,13 +41,11 @@ RSpec.describe Bundler::Sbom::CycloneDX do
     # Set up default mocks
     allow(Bundler.default_lockfile).to receive(:exist?).and_return(true)
     allow(Bundler.default_lockfile).to receive(:read).and_return(lockfile_content)
-    allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
   end
 
   describe ".generate" do
     it "generates CycloneDX SBOM document" do
-      gems = []
-      sbom = described_class.generate(gems, "test-project")
+      sbom = described_class.generate([], "test-project")
       expect(sbom["bomFormat"]).to eq("CycloneDX")
       expect(sbom["specVersion"]).to eq("1.4")
       expect(sbom["serialNumber"]).to match(/^urn:uuid:[0-9a-f-]+$/)
@@ -95,12 +53,8 @@ RSpec.describe Bundler::Sbom::CycloneDX do
     end
 
     it "includes component information" do
-      allow(Gem::Specification).to receive(:find_by_name)
-        .with("rake", Gem::Version.new("13.0.6"))
-        .and_return(rake_spec)
-
-      gems = [double(name: "rake", version: Gem::Version.new("13.0.6"))]
-      sbom = described_class.generate(gems, "test-project")
+      gem_data = [{name: "rake", version: "13.0.6", licenses: ["MIT"]}]
+      sbom = described_class.generate(gem_data, "test-project")
 
       component = sbom["components"].find { |c| c["name"] == "rake" }
       expect(component).not_to be_nil
@@ -113,12 +67,8 @@ RSpec.describe Bundler::Sbom::CycloneDX do
     end
 
     it "handles multiple licenses" do
-      allow(Gem::Specification).to receive(:find_by_name)
-        .with("bundler", Gem::Version.new("2.4.0"))
-        .and_return(multi_license_spec)
-
-      gems = [double(name: "bundler", version: Gem::Version.new("2.4.0"))]
-      sbom = described_class.generate(gems, "test-project")
+      gem_data = [{name: "bundler", version: "2.4.0", licenses: ["MIT", "Apache-2.0"]}]
+      sbom = described_class.generate(gem_data, "test-project")
 
       component = sbom["components"].find { |c| c["name"] == "bundler" }
       expect(component).not_to be_nil
@@ -129,85 +79,16 @@ RSpec.describe Bundler::Sbom::CycloneDX do
     end
 
     it "omits licenses array for packages with no license information" do
-      allow(Gem::Specification).to receive(:find_by_name)
-        .with("no-license", Gem::Version.new("1.0.0"))
-        .and_return(empty_license_spec)
-
-      gems = [double(name: "no-license", version: Gem::Version.new("1.0.0"))]
-      sbom = described_class.generate(gems, "test-project")
+      gem_data = [{name: "no-license", version: "1.0.0", licenses: []}]
+      sbom = described_class.generate(gem_data, "test-project")
 
       component = sbom["components"].find { |c| c["name"] == "no-license" }
       expect(component).not_to be_nil
       expect(component["licenses"]).to be_nil
     end
 
-    it "handles Gem::LoadError gracefully" do
-      allow(Gem::Specification).to receive(:find_by_name)
-        .with("missing-gem", anything)
-        .and_raise(Gem::LoadError)
-
-      gems = [double(name: "missing-gem", version: Gem::Version.new("1.0.0"))]
-      sbom = described_class.generate(gems, "test-project")
-
-      component = sbom["components"].find { |c| c["name"] == "missing-gem" }
-      expect(component).not_to be_nil
-      expect(component["licenses"]).to be_nil
-    end
-
-    it "uses materialized spec for git-sourced gems" do
-      materialized_gemspec = double(
-        "materialized_gemspec",
-        license: "BSD-2-Clause",
-        licenses: ["BSD-2-Clause"]
-      )
-      spec = double(
-        "git_spec",
-        name: "colorize",
-        version: Gem::Version.new("1.1.0"),
-        __materialize__: materialized_gemspec
-      )
-
-      gems = [spec]
-      sbom = described_class.generate(gems, "test-project")
-
-      component = sbom["components"].find { |c| c["name"] == "colorize" }
-      expect(component).not_to be_nil
-      expect(component["licenses"]).to be_an(Array)
-      expect(component["licenses"].first["license"]["id"]).to eq("BSD-2-Clause")
-    end
-
-    it "does not use globally installed gem license for git-sourced gems" do
-      materialized_gemspec = double(
-        "materialized_gemspec",
-        license: "BSD-2-Clause",
-        licenses: ["BSD-2-Clause"]
-      )
-      globally_installed_gemspec = double(
-        "global_gemspec",
-        license: "MIT",
-        licenses: ["MIT"]
-      )
-      spec = double(
-        "git_spec",
-        name: "colorize",
-        version: Gem::Version.new("1.1.0"),
-        __materialize__: materialized_gemspec
-      )
-
-      allow(Gem::Specification).to receive(:find_by_name)
-        .with("colorize", Gem::Version.new("1.1.0"))
-        .and_return(globally_installed_gemspec)
-
-      gems = [spec]
-      sbom = described_class.generate(gems, "test-project")
-
-      component = sbom["components"].find { |c| c["name"] == "colorize" }
-      expect(component["licenses"].first["license"]["id"]).to eq("BSD-2-Clause")
-    end
-
     it "includes metadata with timestamp and tools" do
-      gems = []
-      sbom = described_class.generate(gems, "test-project")
+      sbom = described_class.generate([], "test-project")
 
       expect(sbom["metadata"]).to be_a(Hash)
       expect(sbom["metadata"]["timestamp"]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/)

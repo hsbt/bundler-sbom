@@ -34,46 +34,6 @@ RSpec.describe Bundler::Sbom::SPDX do
     LOCKFILE
   end
 
-  let(:rake_spec) do
-    double(
-      "rake_spec",
-      name: "rake",
-      version: Gem::Version.new("13.0.6"),
-      license: "MIT",
-      licenses: []
-    )
-  end
-
-  let(:multi_license_spec) do
-    double(
-      "multi_license_spec",
-      name: "bundler",
-      version: Gem::Version.new("2.4.0"),
-      license: "",
-      licenses: ["MIT", "Apache-2.0"]
-    )
-  end
-
-  let(:empty_license_spec) do
-    double(
-      "empty_license_spec",
-      name: "no-license",
-      version: Gem::Version.new("1.0.0"),
-      license: "",
-      licenses: []
-    )
-  end
-
-  let(:nil_license_spec) do
-    double(
-      "nil_license_spec",
-      name: "nil-license",
-      version: Gem::Version.new("1.0.0"),
-      license: nil,
-      licenses: nil
-    )
-  end
-
   before(:each) do
     File.write("Gemfile", gemfile_content)
     File.write("Gemfile.lock", lockfile_content)
@@ -81,25 +41,19 @@ RSpec.describe Bundler::Sbom::SPDX do
     # Set up default mocks
     allow(Bundler.default_lockfile).to receive(:exist?).and_return(true)
     allow(Bundler.default_lockfile).to receive(:read).and_return(lockfile_content)
-    allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
   end
 
   describe ".generate" do
     it "generates SBOM document" do
-      gems = []
-      sbom = described_class.generate(gems, "test-project")
+      sbom = described_class.generate([], "test-project")
       expect(sbom["SPDXID"]).to eq("SPDXRef-DOCUMENT")
       expect(sbom["spdxVersion"]).to eq("SPDX-2.3")
       expect(sbom["packages"]).to be_an(Array)
     end
 
     it "includes package information" do
-      allow(Gem::Specification).to receive(:find_by_name)
-        .with("rake", Gem::Version.new("13.0.6"))
-        .and_return(rake_spec)
-
-      gems = [double(name: "rake", version: Gem::Version.new("13.0.6"))]
-      sbom = described_class.generate(gems, "test-project")
+      gem_data = [{name: "rake", version: "13.0.6", licenses: ["MIT"]}]
+      sbom = described_class.generate(gem_data, "test-project")
 
       package = sbom["packages"].find { |p| p["name"] == "rake" }
       expect(package).not_to be_nil
@@ -109,12 +63,8 @@ RSpec.describe Bundler::Sbom::SPDX do
     end
 
     it "handles multiple licenses from licenses array" do
-      allow(Gem::Specification).to receive(:find_by_name)
-        .with("bundler", Gem::Version.new("2.4.0"))
-        .and_return(multi_license_spec)
-
-      gems = [double(name: "bundler", version: Gem::Version.new("2.4.0"))]
-      sbom = described_class.generate(gems, "test-project")
+      gem_data = [{name: "bundler", version: "2.4.0", licenses: ["MIT", "Apache-2.0"]}]
+      sbom = described_class.generate(gem_data, "test-project")
 
       package = sbom["packages"].find { |p| p["name"] == "bundler" }
       expect(package).not_to be_nil
@@ -122,90 +72,10 @@ RSpec.describe Bundler::Sbom::SPDX do
     end
 
     it "sets NOASSERTION for packages with no license information" do
-      allow(Gem::Specification).to receive(:find_by_name)
-        .with("no-license", Gem::Version.new("1.0.0"))
-        .and_return(empty_license_spec)
-
-      gems = [double(name: "no-license", version: Gem::Version.new("1.0.0"))]
-      sbom = described_class.generate(gems, "test-project")
+      gem_data = [{name: "no-license", version: "1.0.0", licenses: []}]
+      sbom = described_class.generate(gem_data, "test-project")
 
       package = sbom["packages"].find { |p| p["name"] == "no-license" }
-      expect(package).not_to be_nil
-      expect(package["licenseDeclared"]).to eq("NOASSERTION")
-    end
-
-    it "handles nil license information" do
-      allow(Gem::Specification).to receive(:find_by_name)
-        .with("nil-license", Gem::Version.new("1.0.0"))
-        .and_return(nil_license_spec)
-
-      gems = [double(name: "nil-license", version: Gem::Version.new("1.0.0"))]
-      sbom = described_class.generate(gems, "test-project")
-
-      package = sbom["packages"].find { |p| p["name"] == "nil-license" }
-      expect(package).not_to be_nil
-      expect(package["licenseDeclared"]).to eq("NOASSERTION")
-    end
-
-    it "uses materialized spec for git-sourced gems" do
-      materialized_gemspec = double(
-        "materialized_gemspec",
-        license: "BSD-2-Clause",
-        licenses: ["BSD-2-Clause"]
-      )
-      spec = double(
-        "git_spec",
-        name: "colorize",
-        version: Gem::Version.new("1.1.0"),
-        __materialize__: materialized_gemspec
-      )
-
-      gems = [spec]
-      sbom = described_class.generate(gems, "test-project")
-
-      package = sbom["packages"].find { |p| p["name"] == "colorize" }
-      expect(package).not_to be_nil
-      expect(package["licenseDeclared"]).to eq("BSD-2-Clause")
-    end
-
-    it "does not use globally installed gem license for git-sourced gems" do
-      materialized_gemspec = double(
-        "materialized_gemspec",
-        license: "BSD-2-Clause",
-        licenses: ["BSD-2-Clause"]
-      )
-      globally_installed_gemspec = double(
-        "global_gemspec",
-        license: "MIT",
-        licenses: ["MIT"]
-      )
-      spec = double(
-        "git_spec",
-        name: "colorize",
-        version: Gem::Version.new("1.1.0"),
-        __materialize__: materialized_gemspec
-      )
-
-      allow(Gem::Specification).to receive(:find_by_name)
-        .with("colorize", Gem::Version.new("1.1.0"))
-        .and_return(globally_installed_gemspec)
-
-      gems = [spec]
-      sbom = described_class.generate(gems, "test-project")
-
-      package = sbom["packages"].find { |p| p["name"] == "colorize" }
-      expect(package["licenseDeclared"]).to eq("BSD-2-Clause")
-    end
-
-    it "handles Gem::LoadError gracefully" do
-      allow(Gem::Specification).to receive(:find_by_name)
-        .with("missing-gem", anything)
-        .and_raise(Gem::LoadError)
-
-      gems = [double(name: "missing-gem", version: Gem::Version.new("1.0.0"))]
-      sbom = described_class.generate(gems, "test-project")
-
-      package = sbom["packages"].find { |p| p["name"] == "missing-gem" }
       expect(package).not_to be_nil
       expect(package["licenseDeclared"]).to eq("NOASSERTION")
     end

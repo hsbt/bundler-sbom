@@ -22,12 +22,13 @@ module Bundler
 
         # Get gems to include based on groups
         gems = get_gems_for_groups(lockfile, without_groups)
+        gem_data = resolve_gem_data(gems)
 
         case format.to_s.downcase
         when "cyclonedx"
-          CycloneDX.generate(gems, document_name)
+          CycloneDX.generate(gem_data, document_name)
         else # default to spdx
-          SPDX.generate(gems, document_name)
+          SPDX.generate(gem_data, document_name)
         end
       end
 
@@ -87,6 +88,17 @@ module Bundler
         end
       end
       private_class_method :get_gems_for_groups
+
+      def self.resolve_gem_data(gems)
+        seen = Set.new
+        gems.filter_map do |spec|
+          gem_key = "#{spec.name}:#{spec.version}"
+          next if seen.include?(gem_key)
+          seen.add(gem_key)
+          {name: spec.name, version: spec.version.to_s, licenses: SpecLicenseFinder.find_licenses(spec)}
+        end
+      end
+      private_class_method :resolve_gem_data
     end
   end
 end

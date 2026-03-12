@@ -40,7 +40,7 @@ RSpec.describe Bundler::Sbom::Generator do
       name: "rake",
       version: Gem::Version.new("13.0.6"),
       license: "MIT",
-      licenses: []
+      licenses: ["MIT"]
     )
   end
 

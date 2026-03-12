@@ -21,17 +21,11 @@ module Bundler
           Bundler.ui.warn("Warning: Could not find license information for #{spec.name} (#{spec.version})")
         end
 
-        licenses = []
-        if gemspec
-          if gemspec.respond_to?(:license) && gemspec.license && !gemspec.license.empty?
-            licenses << gemspec.license
-          end
-          if gemspec.respond_to?(:licenses) && gemspec.licenses && !gemspec.licenses.empty?
-            licenses.concat(gemspec.licenses)
-          end
-          licenses.uniq!
+        if gemspec && gemspec.respond_to?(:licenses) && gemspec.licenses && !gemspec.licenses.empty?
+          gemspec.licenses
+        else
+          []
         end
-        licenses
       end
     end
   end
