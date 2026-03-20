@@ -109,5 +109,69 @@ RSpec.describe Bundler::Sbom::SpecLicenseFinder do
         expect(licenses).to eq(["MIT"])
       end
     end
+
+    context "when spec supports materialize_for_installation but not __materialize__ (Bundler >= 2.7)" do
+      it "uses materialize_for_installation for license lookup" do
+        materialized_gemspec = double(
+          "stub_spec",
+          license: "GPL-2.0-only",
+          licenses: ["GPL-2.0-only", "GPL-3.0-only"]
+        )
+        spec = double(
+          "lazy_spec",
+          name: "ttfunk",
+          version: Gem::Version.new("1.8.0"),
+          materialize_for_installation: materialized_gemspec
+        )
+
+        licenses = described_class.find_licenses(spec)
+        expect(licenses).to eq(["GPL-2.0-only", "GPL-3.0-only"])
+      end
+
+      it "falls back to find_by_name when materialize_for_installation raises a GemspecError" do
+        gemspec = double(
+          "gemspec",
+          license: "MIT",
+          licenses: ["MIT"]
+        )
+        spec = double(
+          "lazy_spec",
+          name: "my-gem",
+          version: Gem::Version.new("1.0.0")
+        )
+
+        allow(spec).to receive(:materialize_for_installation).and_raise(Bundler::GemspecError, "custom DSL method not available")
+
+        allow(Gem::Specification).to receive(:find_by_name)
+          .with("my-gem", Gem::Version.new("1.0.0"))
+          .and_return(gemspec)
+
+        licenses = described_class.find_licenses(spec)
+        expect(licenses).to eq(["MIT"])
+      end
+
+      it "falls back to find_by_name when materialize_for_installation returns self without licenses" do
+        # materialize_for_installation can return self (a LazySpecification)
+        # which does not respond to :licenses
+        spec = double(
+          "lazy_spec",
+          name: "overmind",
+          version: Gem::Version.new("2.0.0")
+        )
+        allow(spec).to receive(:materialize_for_installation).and_return(spec)
+
+        gemspec = double(
+          "gemspec",
+          license: "MIT",
+          licenses: ["MIT"]
+        )
+        allow(Gem::Specification).to receive(:find_by_name)
+          .with("overmind", Gem::Version.new("2.0.0"))
+          .and_return(gemspec)
+
+        licenses = described_class.find_licenses(spec)
+        expect(licenses).to eq(["MIT"])
+      end
+    end
   end
 end
