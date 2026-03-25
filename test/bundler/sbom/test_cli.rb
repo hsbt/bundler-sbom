@@ -45,13 +45,15 @@ class Bundler::Sbom::CLITest < Minitest::Test
     mock_generator = Minitest::Mock.new
     mock_generator.expect(:generate, spdx_instance)
 
+    out = nil
     Bundler::Sbom::Generator.stub(:new, mock_generator) do
-      capture_io { Bundler::Sbom::CLI.start(%w[dump]) }
+      out, = capture_io { Bundler::Sbom::CLI.start(%w[dump]) }
     end
 
     assert File.exist?("bom.json"), "bom.json should be created"
     parsed = JSON.parse(File.read("bom.json"))
     assert_equal sample_spdx_sbom, parsed
+    assert_match(/Generated SPDX SBOM at bom\.json/, out)
     mock_generator.verify
   end
 
@@ -63,12 +65,14 @@ class Bundler::Sbom::CLITest < Minitest::Test
     mock_generator = Minitest::Mock.new
     mock_generator.expect(:generate, spdx_instance)
 
+    out = nil
     Bundler::Sbom::Generator.stub(:new, mock_generator) do
-      capture_io { Bundler::Sbom::CLI.start(%w[dump --format xml]) }
+      out, = capture_io { Bundler::Sbom::CLI.start(%w[dump --format xml]) }
     end
 
     assert File.exist?("bom.xml"), "bom.xml should be created"
     assert_equal xml_output, File.read("bom.xml")
+    assert_match(/Generated SPDX SBOM at bom\.xml/, out)
     mock_generator.verify
   end
 
@@ -77,13 +81,15 @@ class Bundler::Sbom::CLITest < Minitest::Test
     mock_generator = Minitest::Mock.new
     mock_generator.expect(:generate, cyclonedx_instance)
 
+    out = nil
     Bundler::Sbom::Generator.stub(:new, mock_generator) do
-      capture_io { Bundler::Sbom::CLI.start(%w[dump --sbom cyclonedx]) }
+      out, = capture_io { Bundler::Sbom::CLI.start(%w[dump --sbom cyclonedx]) }
     end
 
     assert File.exist?("bom-cyclonedx.json"), "bom-cyclonedx.json should be created"
     parsed = JSON.parse(File.read("bom-cyclonedx.json"))
     assert_equal sample_cyclonedx_sbom, parsed
+    assert_match(/Generated CYCLONEDX SBOM at bom-cyclonedx\.json/, out)
     mock_generator.verify
   end
 
@@ -95,12 +101,14 @@ class Bundler::Sbom::CLITest < Minitest::Test
     mock_generator = Minitest::Mock.new
     mock_generator.expect(:generate, cyclonedx_instance)
 
+    out = nil
     Bundler::Sbom::Generator.stub(:new, mock_generator) do
-      capture_io { Bundler::Sbom::CLI.start(%w[dump --format xml --sbom cyclonedx]) }
+      out, = capture_io { Bundler::Sbom::CLI.start(%w[dump --format xml --sbom cyclonedx]) }
     end
 
     assert File.exist?("bom-cyclonedx.xml"), "bom-cyclonedx.xml should be created"
     assert_equal xml_output, File.read("bom-cyclonedx.xml")
+    assert_match(/Generated CYCLONEDX SBOM at bom-cyclonedx\.xml/, out)
     mock_generator.verify
   end
 
