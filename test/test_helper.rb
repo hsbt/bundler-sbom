@@ -1,16 +1,17 @@
 require "simplecov"
 SimpleCov.start do
-  add_filter "/spec/"
+  add_filter "/test/"
   minimum_coverage 98
 end
 
+require "minitest/autorun"
+require "minitest/mock"
 require "bundler"
 require "bundler/sbom"
-require "rspec/its"
 require "tmpdir"
 require "fileutils"
 
-module SpecHelper
+module TestHelper
   def self.root
     @root ||= Pathname.new(File.expand_path("../..", __FILE__))
   end
@@ -32,29 +33,12 @@ module SpecHelper
       FileUtils.remove_entry(dir) if Dir.exist?(dir)
     end
   end
-end
 
-RSpec.configure do |config|
-  config.expect_with :rspec do |expectations|
-    expectations.include_chain_clauses_in_custom_matcher_descriptions = true
+  def with_temp_dir(&block)
+    TestHelper.with_temp_dir(&block)
   end
 
-  config.mock_with :rspec do |mocks|
-    mocks.verify_partial_doubles = true
-  end
-
-  config.shared_context_metadata_behavior = :apply_to_host_groups
-  config.filter_run_when_matching :focus
-  config.example_status_persistence_file_path = "spec/examples.txt"
-  config.disable_monkey_patching!
-  config.warnings = true
-
-  config.default_formatter = "doc" if config.files_to_run.one?
-
-  config.order = :random
-  Kernel.srand config.seed
-
-  config.before(:each) do
-    SpecHelper.reset_env!
+  def setup
+    TestHelper.reset_env!
   end
 end

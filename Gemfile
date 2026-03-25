@@ -5,9 +5,8 @@ gemspec
 group :development do
   gem "thor"
   gem "rake"
-  gem "rspec"
+  gem "minitest"
+  gem "minitest-mock"
   gem "simplecov", require: false
-  gem "rspec-its"
-  gem "rspec-mocks"
   gem "json_schemer"
 end
