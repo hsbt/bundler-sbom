@@ -49,6 +49,13 @@ module Bundler
         end
 
         sbom["documentDescribes"] = sbom["packages"].map { |p| p["SPDXID"] }
+        sbom["relationships"] = sbom["packages"].map do |p|
+          {
+            "spdxElementId" => "SPDXRef-DOCUMENT",
+            "relatedSpdxElement" => p["SPDXID"],
+            "relationshipType" => "DESCRIBES"
+          }
+        end
         new(sbom)
       end
 
@@ -67,7 +74,8 @@ module Bundler
             "creators" => []
           },
           "packages" => [],
-          "documentDescribes" => []
+          "documentDescribes" => [],
+          "relationships" => []
         }
 
         REXML::XPath.each(root, "creationInfo/creator") do |creator|
@@ -102,6 +110,14 @@ module Bundler
           end
 
           sbom["packages"] << package
+        end
+
+        REXML::XPath.each(root, "relationship") do |rel_element|
+          sbom["relationships"] << {
+            "spdxElementId" => get_element_text(rel_element, "spdxElementId"),
+            "relatedSpdxElement" => get_element_text(rel_element, "relatedSpdxElement"),
+            "relationshipType" => get_element_text(rel_element, "relationshipType")
+          }
         end
 
         new(sbom)
@@ -157,6 +173,17 @@ module Bundler
               add_element(ext_ref, "referenceType", ref["referenceType"])
               add_element(ext_ref, "referenceLocator", ref["referenceLocator"])
             end
+          end
+        end
+
+        if @data["relationships"]
+          @data["relationships"].each do |rel|
+            relationship = REXML::Element.new("relationship")
+            root.add_element(relationship)
+
+            add_element(relationship, "spdxElementId", rel["spdxElementId"])
+            add_element(relationship, "relatedSpdxElement", rel["relatedSpdxElement"])
+            add_element(relationship, "relationshipType", rel["relationshipType"])
           end
         end
 

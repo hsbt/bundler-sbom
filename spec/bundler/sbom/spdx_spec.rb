@@ -63,6 +63,20 @@ RSpec.describe Bundler::Sbom::SPDX do
       expect(package["licenseDeclared"]).to eq("MIT")
     end
 
+    it "includes DESCRIBES relationships" do
+      gem_data = [{name: "rake", version: "13.0.6", licenses: ["MIT"]}]
+      sbom = described_class.generate(gem_data, "test-project")
+
+      relationships = sbom.to_hash["relationships"]
+      expect(relationships).to contain_exactly(
+        {
+          "spdxElementId" => "SPDXRef-DOCUMENT",
+          "relatedSpdxElement" => "SPDXRef-Package-rake",
+          "relationshipType" => "DESCRIBES"
+        }
+      )
+    end
+
     it "handles multiple licenses from licenses array" do
       gem_data = [{name: "bundler", version: "2.4.0", licenses: ["MIT", "Apache-2.0"]}]
       sbom = described_class.generate(gem_data, "test-project")
@@ -120,6 +134,13 @@ RSpec.describe Bundler::Sbom::SPDX do
           "licenseListVersion" => "3.20"
         },
         "documentDescribes" => ["SPDXRef-Package-rake"],
+        "relationships" => [
+          {
+            "spdxElementId" => "SPDXRef-DOCUMENT",
+            "relatedSpdxElement" => "SPDXRef-Package-rake",
+            "relationshipType" => "DESCRIBES"
+          }
+        ],
         "packages" => [
           {
             "SPDXID" => "SPDXRef-Package-rake",
@@ -166,6 +187,12 @@ RSpec.describe Bundler::Sbom::SPDX do
       ext_ref = REXML::XPath.first(package, "externalRef")
       expect(ext_ref).not_to be_nil
       expect(REXML::XPath.first(ext_ref, "referenceLocator").text).to eq("pkg:gem/rake@13.0.6")
+
+      rel = REXML::XPath.first(root, "relationship")
+      expect(rel).not_to be_nil
+      expect(REXML::XPath.first(rel, "spdxElementId").text).to eq("SPDXRef-DOCUMENT")
+      expect(REXML::XPath.first(rel, "relatedSpdxElement").text).to eq("SPDXRef-Package-rake")
+      expect(REXML::XPath.first(rel, "relationshipType").text).to eq("DESCRIBES")
     end
   end
 
@@ -201,6 +228,11 @@ RSpec.describe Bundler::Sbom::SPDX do
               <referenceLocator>pkg:gem/rake@13.0.6</referenceLocator>
             </externalRef>
           </package>
+          <relationship>
+            <spdxElementId>SPDXRef-DOCUMENT</spdxElementId>
+            <relatedSpdxElement>SPDXRef-Package-rake</relatedSpdxElement>
+            <relationshipType>DESCRIBES</relationshipType>
+          </relationship>
         </SpdxDocument>
       XML
     end
@@ -235,6 +267,12 @@ RSpec.describe Bundler::Sbom::SPDX do
       expect(ext_ref["referenceCategory"]).to eq("PACKAGE-MANAGER")
       expect(ext_ref["referenceType"]).to eq("purl")
       expect(ext_ref["referenceLocator"]).to eq("pkg:gem/rake@13.0.6")
+
+      relationships = sbom.to_hash["relationships"]
+      expect(relationships.size).to eq(1)
+      expect(relationships.first["spdxElementId"]).to eq("SPDXRef-DOCUMENT")
+      expect(relationships.first["relatedSpdxElement"]).to eq("SPDXRef-Package-rake")
+      expect(relationships.first["relationshipType"]).to eq("DESCRIBES")
     end
   end
 end
