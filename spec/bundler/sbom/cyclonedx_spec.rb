@@ -79,6 +79,22 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       expect(license_ids).to include("Apache-2.0")
     end
 
+    it "uses name field for non-SPDX license IDs" do
+      gem_data = [{name: "my-gem", version: "1.0.0", licenses: ["Nonstandard"]}]
+      sbom = described_class.generate(gem_data, "test-project")
+
+      component = sbom.to_hash["components"].find { |c| c["name"] == "my-gem" }
+      expect(component["licenses"]).to eq([{"license" => {"name" => "Nonstandard"}}])
+    end
+
+    it "maps deprecated SPDX license IDs to current equivalents" do
+      gem_data = [{name: "my-gem", version: "1.0.0", licenses: ["GPL-2.0"]}]
+      sbom = described_class.generate(gem_data, "test-project")
+
+      component = sbom.to_hash["components"].find { |c| c["name"] == "my-gem" }
+      expect(component["licenses"]).to eq([{"license" => {"id" => "GPL-2.0-only"}}])
+    end
+
     it "omits licenses array for packages with no license information" do
       gem_data = [{name: "no-license", version: "1.0.0", licenses: []}]
       sbom = described_class.generate(gem_data, "test-project")

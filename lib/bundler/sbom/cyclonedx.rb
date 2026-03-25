@@ -42,7 +42,7 @@ module Bundler
           }
 
           unless gem[:licenses].empty?
-            component["licenses"] = gem[:licenses].map { |license| {"license" => {"id" => license}} }
+            component["licenses"] = gem[:licenses].map { |license| build_license_entry(license) }
           end
 
           sbom["components"] << component
@@ -91,7 +91,12 @@ module Bundler
           licenses = []
           REXML::XPath.each(comp, "licenses/license") do |license|
             license_id = get_element_text(license, "id")
-            licenses << {"license" => {"id" => license_id}} if license_id
+            license_name = get_element_text(license, "name")
+            if license_id
+              licenses << {"license" => {"id" => license_id}}
+            elsif license_name
+              licenses << {"license" => {"name" => license_name}}
+            end
           end
 
           component["licenses"] = licenses unless licenses.empty?
@@ -159,6 +164,8 @@ module Bundler
 
               if license_data["license"]["id"]
                 add_element(license, "id", license_data["license"]["id"])
+              elsif license_data["license"]["name"]
+                add_element(license, "name", license_data["license"]["name"])
               end
             end
           end
@@ -171,7 +178,7 @@ module Bundler
         {
           "packages" => @data["components"].map do |comp|
             license_string = if comp["licenses"]
-              comp["licenses"].map { |l| l["license"]["id"] }.join(", ")
+              comp["licenses"].map { |l| l["license"]["id"] || l["license"]["name"] }.join(", ")
             else
               "NOASSERTION"
             end
@@ -183,6 +190,18 @@ module Bundler
           end
         }
       end
+
+      def self.build_license_entry(license)
+        mapped = SPDX::DEPRECATED_LICENSE_MAP[license]
+        license = mapped if mapped
+
+        if SPDX::KNOWN_SPDX_IDS.include?(license)
+          {"license" => {"id" => license}}
+        else
+          {"license" => {"name" => license}}
+        end
+      end
+      private_class_method :build_license_entry
     end
   end
 end
