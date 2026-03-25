@@ -31,7 +31,7 @@ module Bundler
             "SPDXID" => "SPDXRef-Package-#{gem[:name]}",
             "name" => gem[:name],
             "versionInfo" => gem[:version],
-            "downloadLocation" => "NOASSERTION",
+            "downloadLocation" => "https://rubygems.org/gems/#{gem[:name]}/versions/#{gem[:version]}",
             "filesAnalyzed" => false,
             "licenseConcluded" => license_string,
             "licenseDeclared" => license_string,
