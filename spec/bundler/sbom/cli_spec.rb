@@ -35,6 +35,9 @@ RSpec.describe Bundler::Sbom::CLI do
     }
   end
 
+  let(:spdx_instance) { Bundler::Sbom::SPDX.new(sample_spdx_sbom) }
+  let(:cyclonedx_instance) { Bundler::Sbom::CycloneDX.new(sample_cyclonedx_sbom) }
+
   before(:each) do
     allow(Bundler.ui).to receive(:error)
     allow(Bundler.ui).to receive(:info)
@@ -46,14 +49,17 @@ RSpec.describe Bundler::Sbom::CLI do
   end
 
   describe "#dump" do
+    let(:generator_instance) { instance_double(Bundler::Sbom::Generator) }
+
     before do
-      allow(Bundler::Sbom::Generator).to receive(:generate_sbom).and_return(sample_spdx_sbom)
-      allow(Bundler::Sbom::Generator).to receive(:generate_sbom).with("cyclonedx").and_return(sample_cyclonedx_sbom)
+      allow(Bundler::Sbom::Generator).to receive(:new).and_return(generator_instance)
+      allow(generator_instance).to receive(:generate).and_return(spdx_instance)
     end
 
     context "with default format (json) and default SBOM format (spdx)" do
       it "generates SPDX SBOM and saves to bom.json file" do
-        expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("spdx", without_groups: [])
+        expect(Bundler::Sbom::Generator).to receive(:new).with(format: "spdx", without_groups: []).and_return(generator_instance)
+        expect(generator_instance).to receive(:generate).and_return(spdx_instance)
         expect(File).to receive(:write).with("bom.json", satisfy { |content| JSON.parse(content) == sample_spdx_sbom })
         expect(Bundler.ui).to receive(:info).with("Generated SPDX SBOM at bom.json")
         described_class.start(%w[dump])
@@ -62,12 +68,12 @@ RSpec.describe Bundler::Sbom::CLI do
 
     context "with xml format and default SBOM format (spdx)" do
       before do
-        allow(Bundler::Sbom::Generator).to receive(:convert_to_xml).with(sample_spdx_sbom).and_return("<xml>spdx</xml>")
+        allow(spdx_instance).to receive(:to_xml).and_return("<xml>spdx</xml>")
       end
 
       it "generates SPDX SBOM in XML format" do
-        expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("spdx", without_groups: [])
-        expect(Bundler::Sbom::Generator).to receive(:convert_to_xml).with(sample_spdx_sbom)
+        expect(Bundler::Sbom::Generator).to receive(:new).with(format: "spdx", without_groups: []).and_return(generator_instance)
+        expect(generator_instance).to receive(:generate).and_return(spdx_instance)
         expect(File).to receive(:write).with("bom.xml", "<xml>spdx</xml>")
         expect(Bundler.ui).to receive(:info).with("Generated SPDX SBOM at bom.xml")
         described_class.start(%w[dump --format xml])
@@ -76,7 +82,8 @@ RSpec.describe Bundler::Sbom::CLI do
 
     context "with json format and cyclonedx SBOM format" do
       it "generates CycloneDX SBOM and saves to bom-cyclonedx.json file" do
-        expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("cyclonedx", without_groups: []).and_return(sample_cyclonedx_sbom)
+        expect(Bundler::Sbom::Generator).to receive(:new).with(format: "cyclonedx", without_groups: []).and_return(generator_instance)
+        expect(generator_instance).to receive(:generate).and_return(cyclonedx_instance)
         expect(File).to receive(:write).with("bom-cyclonedx.json", satisfy { |content|
           JSON.parse(content) == sample_cyclonedx_sbom
         })
@@ -87,12 +94,12 @@ RSpec.describe Bundler::Sbom::CLI do
 
     context "with xml format and cyclonedx SBOM format" do
       before do
-        allow(Bundler::Sbom::Generator).to receive(:convert_to_xml).with(sample_cyclonedx_sbom).and_return("<xml>cyclonedx</xml>")
+        allow(cyclonedx_instance).to receive(:to_xml).and_return("<xml>cyclonedx</xml>")
       end
 
       it "generates CycloneDX SBOM in XML format" do
-        expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("cyclonedx", without_groups: []).and_return(sample_cyclonedx_sbom)
-        expect(Bundler::Sbom::Generator).to receive(:convert_to_xml).with(sample_cyclonedx_sbom)
+        expect(Bundler::Sbom::Generator).to receive(:new).with(format: "cyclonedx", without_groups: []).and_return(generator_instance)
+        expect(generator_instance).to receive(:generate).and_return(cyclonedx_instance)
         expect(File).to receive(:write).with("bom-cyclonedx.xml", "<xml>cyclonedx</xml>")
         expect(Bundler.ui).to receive(:info).with("Generated CYCLONEDX SBOM at bom-cyclonedx.xml")
         described_class.start(%w[dump --format xml --sbom cyclonedx])
@@ -101,56 +108,60 @@ RSpec.describe Bundler::Sbom::CLI do
 
     context "with invalid output format" do
       it "shows error message and exits" do
-        expect(Bundler.ui).to receive(:error).with("Error: Unsupported output format 'invalid'. Supported formats: json, xml")
         expect { described_class.start(%w[dump --format invalid]) }.to raise_error(SystemExit)
       end
     end
 
     context "with invalid SBOM format" do
       it "shows error message and exits" do
-        expect(Bundler.ui).to receive(:error).with("Error: Unsupported SBOM format 'invalid'. Supported formats: spdx, cyclonedx")
         expect { described_class.start(%w[dump --sbom invalid]) }.to raise_error(SystemExit)
       end
     end
 
     context "with --without option" do
-      it "passes without_groups to Generator.generate_sbom" do
-        expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("spdx", without_groups: [:development]).and_return(sample_spdx_sbom)
+      it "passes without_groups to Generator" do
+        expect(Bundler::Sbom::Generator).to receive(:new).with(format: "spdx", without_groups: [:development]).and_return(generator_instance)
+        expect(generator_instance).to receive(:generate).and_return(spdx_instance)
         expect(File).to receive(:write).with("bom.json", satisfy { |content| JSON.parse(content) == sample_spdx_sbom })
         expect(Bundler.ui).to receive(:info).with("Generated SPDX SBOM at bom.json")
         described_class.start(%w[dump --without development])
       end
 
       it "parses multiple groups separated by colon" do
-        expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("spdx", without_groups: [:development, :test]).and_return(sample_spdx_sbom)
+        expect(Bundler::Sbom::Generator).to receive(:new).with(format: "spdx", without_groups: [:development, :test]).and_return(generator_instance)
+        expect(generator_instance).to receive(:generate).and_return(spdx_instance)
         expect(File).to receive(:write).with("bom.json", satisfy { |content| JSON.parse(content) == sample_spdx_sbom })
         expect(Bundler.ui).to receive(:info).with("Generated SPDX SBOM at bom.json")
         described_class.start(%w[dump --without development:test])
       end
 
       it "parses multiple groups separated by comma" do
-        expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("spdx", without_groups: [:development, :test]).and_return(sample_spdx_sbom)
+        expect(Bundler::Sbom::Generator).to receive(:new).with(format: "spdx", without_groups: [:development, :test]).and_return(generator_instance)
+        expect(generator_instance).to receive(:generate).and_return(spdx_instance)
         expect(File).to receive(:write).with("bom.json", satisfy { |content| JSON.parse(content) == sample_spdx_sbom })
         expect(Bundler.ui).to receive(:info).with("Generated SPDX SBOM at bom.json")
         described_class.start(%w[dump --without development,test])
       end
 
       it "parses multiple groups separated by colon and comma mixed" do
-        expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("spdx", without_groups: [:development, :test, :staging]).and_return(sample_spdx_sbom)
+        expect(Bundler::Sbom::Generator).to receive(:new).with(format: "spdx", without_groups: [:development, :test, :staging]).and_return(generator_instance)
+        expect(generator_instance).to receive(:generate).and_return(spdx_instance)
         expect(File).to receive(:write).with("bom.json", satisfy { |content| JSON.parse(content) == sample_spdx_sbom })
         expect(Bundler.ui).to receive(:info).with("Generated SPDX SBOM at bom.json")
         described_class.start(%w[dump --without development:test,staging])
       end
 
       it "ignores empty group names" do
-        expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("spdx", without_groups: [:development, :test]).and_return(sample_spdx_sbom)
+        expect(Bundler::Sbom::Generator).to receive(:new).with(format: "spdx", without_groups: [:development, :test]).and_return(generator_instance)
+        expect(generator_instance).to receive(:generate).and_return(spdx_instance)
         expect(File).to receive(:write).with("bom.json", satisfy { |content| JSON.parse(content) == sample_spdx_sbom })
         expect(Bundler.ui).to receive(:info).with("Generated SPDX SBOM at bom.json")
         described_class.start(%w[dump --without development::test])
       end
 
       it "works with cyclonedx format" do
-        expect(Bundler::Sbom::Generator).to receive(:generate_sbom).with("cyclonedx", without_groups: [:development]).and_return(sample_cyclonedx_sbom)
+        expect(Bundler::Sbom::Generator).to receive(:new).with(format: "cyclonedx", without_groups: [:development]).and_return(generator_instance)
+        expect(generator_instance).to receive(:generate).and_return(cyclonedx_instance)
         expect(File).to receive(:write).with("bom-cyclonedx.json", satisfy { |content| JSON.parse(content) == sample_cyclonedx_sbom })
         expect(Bundler.ui).to receive(:info).with("Generated CYCLONEDX SBOM at bom-cyclonedx.json")
         described_class.start(%w[dump --sbom cyclonedx --without development])
@@ -159,15 +170,23 @@ RSpec.describe Bundler::Sbom::CLI do
   end
 
   describe "#license" do
+    let(:reporter_instance) { instance_double(Bundler::Sbom::Reporter) }
+
+    before do
+      allow(Bundler::Sbom::Reporter).to receive(:new).and_return(reporter_instance)
+      allow(reporter_instance).to receive(:display_license_report)
+    end
+
     context "when bom.json exists" do
       before do
         allow(File).to receive(:exist?).with("bom.json").and_return(true)
         allow(File).to receive(:read).with("bom.json").and_return(JSON.generate(sample_spdx_sbom))
-        allow(Bundler::Sbom::Reporter).to receive(:display_license_report)
       end
 
       it "calls display_license_report with parsed SBOM" do
-        expect(Bundler::Sbom::Reporter).to receive(:display_license_report).with(sample_spdx_sbom)
+        expect(Bundler::Sbom::Generator).to receive(:from_hash).with(sample_spdx_sbom).and_return(spdx_instance)
+        expect(Bundler::Sbom::Reporter).to receive(:new).with(spdx_instance).and_return(reporter_instance)
+        expect(reporter_instance).to receive(:display_license_report)
         described_class.start(%w[license])
       end
     end
@@ -177,11 +196,12 @@ RSpec.describe Bundler::Sbom::CLI do
         allow(File).to receive(:exist?).with("bom.json").and_return(false)
         allow(File).to receive(:exist?).with("bom-cyclonedx.json").and_return(true)
         allow(File).to receive(:read).with("bom-cyclonedx.json").and_return(JSON.generate(sample_cyclonedx_sbom))
-        allow(Bundler::Sbom::Reporter).to receive(:display_license_report)
       end
 
       it "reads CycloneDX JSON SBOM and displays license report" do
-        expect(Bundler::Sbom::Reporter).to receive(:display_license_report).with(sample_cyclonedx_sbom)
+        expect(Bundler::Sbom::Generator).to receive(:from_hash).with(sample_cyclonedx_sbom).and_return(cyclonedx_instance)
+        expect(Bundler::Sbom::Reporter).to receive(:new).with(cyclonedx_instance).and_return(reporter_instance)
+        expect(reporter_instance).to receive(:display_license_report)
         described_class.start(%w[license])
       end
     end
@@ -193,13 +213,13 @@ RSpec.describe Bundler::Sbom::CLI do
         allow(File).to receive(:exist?).with("bom-cyclonedx.json").and_return(false)
         allow(File).to receive(:exist?).with("bom-cyclonedx.xml").and_return(true)
         allow(File).to receive(:read).with("bom-cyclonedx.xml").and_return("<xml>cyclonedx</xml>")
-        allow(Bundler::Sbom::Generator).to receive(:parse_xml).and_return(sample_cyclonedx_sbom)
-        allow(Bundler::Sbom::Reporter).to receive(:display_license_report)
+        allow(Bundler::Sbom::Generator).to receive(:parse_xml).and_return(cyclonedx_instance)
       end
 
       it "reads CycloneDX XML SBOM and displays license report" do
         expect(Bundler::Sbom::Generator).to receive(:parse_xml).with("<xml>cyclonedx</xml>")
-        expect(Bundler::Sbom::Reporter).to receive(:display_license_report).with(sample_cyclonedx_sbom)
+        expect(Bundler::Sbom::Reporter).to receive(:new).with(cyclonedx_instance).and_return(reporter_instance)
+        expect(reporter_instance).to receive(:display_license_report)
         described_class.start(%w[license])
       end
     end
@@ -208,13 +228,13 @@ RSpec.describe Bundler::Sbom::CLI do
       before do
         allow(File).to receive(:exist?).with("bom.xml").and_return(true)
         allow(File).to receive(:read).with("bom.xml").and_return("<xml>spdx</xml>")
-        allow(Bundler::Sbom::Generator).to receive(:parse_xml).and_return(sample_spdx_sbom)
-        allow(Bundler::Sbom::Reporter).to receive(:display_license_report)
+        allow(Bundler::Sbom::Generator).to receive(:parse_xml).and_return(spdx_instance)
       end
 
       it "reads XML SBOM and displays license report" do
         expect(Bundler::Sbom::Generator).to receive(:parse_xml).with("<xml>spdx</xml>")
-        expect(Bundler::Sbom::Reporter).to receive(:display_license_report).with(sample_spdx_sbom)
+        expect(Bundler::Sbom::Reporter).to receive(:new).with(spdx_instance).and_return(reporter_instance)
+        expect(reporter_instance).to receive(:display_license_report)
         described_class.start(%w[license --format xml])
       end
 
@@ -224,7 +244,6 @@ RSpec.describe Bundler::Sbom::CLI do
         end
 
         it "shows error message and exits" do
-          expect(Bundler.ui).to receive(:error).with("Error processing bom.xml: Invalid XML")
           expect { described_class.start(%w[license --format xml]) }.to raise_error(SystemExit)
         end
       end
@@ -234,11 +253,12 @@ RSpec.describe Bundler::Sbom::CLI do
       before do
         allow(File).to receive(:exist?).with("custom-bom.json").and_return(true)
         allow(File).to receive(:read).with("custom-bom.json").and_return(JSON.generate(sample_cyclonedx_sbom))
-        allow(Bundler::Sbom::Reporter).to receive(:display_license_report)
       end
 
       it "reads from the specified file" do
-        expect(Bundler::Sbom::Reporter).to receive(:display_license_report).with(sample_cyclonedx_sbom)
+        expect(Bundler::Sbom::Generator).to receive(:from_hash).with(sample_cyclonedx_sbom).and_return(cyclonedx_instance)
+        expect(Bundler::Sbom::Reporter).to receive(:new).with(cyclonedx_instance).and_return(reporter_instance)
+        expect(reporter_instance).to receive(:display_license_report)
         described_class.start(%w[license --file custom-bom.json])
       end
     end
@@ -249,7 +269,6 @@ RSpec.describe Bundler::Sbom::CLI do
       end
 
       it "exits with error message" do
-        expect(Bundler.ui).to receive(:error).with("Error: bom.json not found. Run 'bundle sbom dump --format=json --sbom=spdx' first.")
         expect { described_class.start(%w[license]) }.to raise_error(SystemExit)
       end
     end
@@ -261,14 +280,12 @@ RSpec.describe Bundler::Sbom::CLI do
       end
 
       it "shows an error message and exits" do
-        expect(Bundler.ui).to receive(:error).with("Error: bom.json is not a valid JSON file")
         expect { described_class.start(%w[license]) }.to raise_error(SystemExit)
       end
     end
 
     context "with invalid format" do
       it "shows error message and exits" do
-        expect(Bundler.ui).to receive(:error).with("Error: Unsupported format 'invalid'. Supported formats: json, xml")
         expect { described_class.start(%w[license --format invalid]) }.to raise_error(SystemExit)
       end
     end

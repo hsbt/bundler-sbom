@@ -40,7 +40,7 @@ RSpec.describe Bundler::Sbom::Generator do
       name: "rake",
       version: Gem::Version.new("13.0.6"),
       license: "MIT",
-      licenses: []
+      licenses: ["MIT"]
     )
   end
 
@@ -84,17 +84,18 @@ RSpec.describe Bundler::Sbom::Generator do
     allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
   end
 
-  describe ".generate_sbom" do
+  describe "#generate" do
     context "with SPDX format (default)" do
       it "generates SBOM document" do
         allow(Bundler::LockfileParser).to receive(:new).and_return(
           double(specs: [])
         )
 
-        sbom = described_class.generate_sbom
-        expect(sbom["SPDXID"]).to eq("SPDXRef-DOCUMENT")
-        expect(sbom["spdxVersion"]).to eq("SPDX-2.3")
-        expect(sbom["packages"]).to be_an(Array)
+        sbom = described_class.new.generate
+        expect(sbom).to be_a(Bundler::Sbom::SPDX)
+        expect(sbom.to_hash["SPDXID"]).to eq("SPDXRef-DOCUMENT")
+        expect(sbom.to_hash["spdxVersion"]).to eq("SPDX-2.3")
+        expect(sbom.to_hash["packages"]).to be_an(Array)
       end
 
       it "includes package information" do
@@ -105,8 +106,8 @@ RSpec.describe Bundler::Sbom::Generator do
           .with("rake", Gem::Version.new("13.0.6"))
           .and_return(rake_spec)
 
-        sbom = described_class.generate_sbom
-        package = sbom["packages"].find { |p| p["name"] == "rake" }
+        sbom = described_class.new.generate
+        package = sbom.to_hash["packages"].find { |p| p["name"] == "rake" }
         expect(package).not_to be_nil
         expect(package["name"]).to eq("rake")
         expect(package["versionInfo"]).to eq("13.0.6")
@@ -121,10 +122,10 @@ RSpec.describe Bundler::Sbom::Generator do
           .with("bundler", Gem::Version.new("2.4.0"))
           .and_return(multi_license_spec)
 
-        sbom = described_class.generate_sbom
-        package = sbom["packages"].find { |p| p["name"] == "bundler" }
+        sbom = described_class.new.generate
+        package = sbom.to_hash["packages"].find { |p| p["name"] == "bundler" }
         expect(package).not_to be_nil
-        expect(package["licenseDeclared"]).to eq("MIT, Apache-2.0")
+        expect(package["licenseDeclared"]).to eq("MIT AND Apache-2.0")
       end
 
       it "sets NOASSERTION for packages with no license information" do
@@ -135,8 +136,8 @@ RSpec.describe Bundler::Sbom::Generator do
           .with("no-license", Gem::Version.new("1.0.0"))
           .and_return(empty_license_spec)
 
-        sbom = described_class.generate_sbom
-        package = sbom["packages"].find { |p| p["name"] == "no-license" }
+        sbom = described_class.new.generate
+        package = sbom.to_hash["packages"].find { |p| p["name"] == "no-license" }
         expect(package).not_to be_nil
         expect(package["licenseDeclared"]).to eq("NOASSERTION")
       end
@@ -149,8 +150,8 @@ RSpec.describe Bundler::Sbom::Generator do
           .with("nil-license", Gem::Version.new("1.0.0"))
           .and_return(nil_license_spec)
 
-        sbom = described_class.generate_sbom
-        package = sbom["packages"].find { |p| p["name"] == "nil-license" }
+        sbom = described_class.new.generate
+        package = sbom.to_hash["packages"].find { |p| p["name"] == "nil-license" }
         expect(package).not_to be_nil
         expect(package["licenseDeclared"]).to eq("NOASSERTION")
       end
@@ -163,14 +164,13 @@ RSpec.describe Bundler::Sbom::Generator do
           .with("missing-gem", anything)
           .and_raise(Gem::LoadError)
 
-        sbom = described_class.generate_sbom
-        package = sbom["packages"].find { |p| p["name"] == "missing-gem" }
+        sbom = described_class.new.generate
+        package = sbom.to_hash["packages"].find { |p| p["name"] == "missing-gem" }
         expect(package).not_to be_nil
         expect(package["licenseDeclared"]).to eq("NOASSERTION")
       end
 
       it "deduplicates gems with multiple platforms" do
-        # Simulate a gem with multiple platform entries in lockfile.specs
         specs_with_duplicates = [
           double(name: "herb", version: Gem::Version.new("1.0.0")),
           double(name: "herb", version: Gem::Version.new("1.0.0")),
@@ -183,25 +183,18 @@ RSpec.describe Bundler::Sbom::Generator do
         )
         allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
 
-        sbom = described_class.generate_sbom
+        sbom = described_class.new.generate
+        expect(sbom.to_hash["packages"].size).to eq(2)
+        expect(sbom.to_hash["documentDescribes"].size).to eq(2)
 
-        # Should only have 2 packages, not 4
-        expect(sbom["packages"].size).to eq(2)
-
-        # documentDescribes should also have 2 entries
-        expect(sbom["documentDescribes"].size).to eq(2)
-
-        # Verify herb appears only once
-        herb_packages = sbom["packages"].select { |p| p["name"] == "herb" }
+        herb_packages = sbom.to_hash["packages"].select { |p| p["name"] == "herb" }
         expect(herb_packages.size).to eq(1)
 
-        # Verify rake appears only once
-        rake_packages = sbom["packages"].select { |p| p["name"] == "rake" }
+        rake_packages = sbom.to_hash["packages"].select { |p| p["name"] == "rake" }
         expect(rake_packages.size).to eq(1)
       end
 
       it "filters out excluded groups" do
-        # Mock Bundler.definition
         development_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
         production_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
 
@@ -211,7 +204,6 @@ RSpec.describe Bundler::Sbom::Generator do
           double(specs: all_specs)
         )
 
-        # Mock Bundler.definition
         definition = double
         allow(Bundler).to receive(:definition).and_return(definition)
         allow(definition).to receive(:groups).and_return([:default, :development])
@@ -224,17 +216,12 @@ RSpec.describe Bundler::Sbom::Generator do
 
         allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
 
-        # Generate SBOM without development group
-        sbom = described_class.generate_sbom("spdx", without_groups: [:development])
-
-        # Should only have rails, not rspec
-        expect(sbom["packages"].size).to eq(1)
-        expect(sbom["packages"].first["name"]).to eq("rails")
+        sbom = described_class.new(format: "spdx", without_groups: [:development]).generate
+        expect(sbom.to_hash["packages"].size).to eq(1)
+        expect(sbom.to_hash["packages"].first["name"]).to eq("rails")
       end
 
       it "includes transitive dependencies of included groups" do
-        # Setup: rails (default) -> activesupport (transitive)
-        #        rspec (development) -> diff-lcs (transitive)
         rails_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
         activesupport_gem = double(name: "activesupport", version: Gem::Version.new("7.0.0"))
         rspec_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
@@ -246,12 +233,10 @@ RSpec.describe Bundler::Sbom::Generator do
           double(specs: all_specs)
         )
 
-        # Mock Bundler.definition to show dependency relationships
         definition = double
         allow(Bundler).to receive(:definition).and_return(definition)
         allow(definition).to receive(:groups).and_return([:default, :development])
 
-        # Direct dependencies only
         allow(definition).to receive(:dependencies_for).with(:default).and_return([
           double(name: "rails")
         ])
@@ -259,24 +244,18 @@ RSpec.describe Bundler::Sbom::Generator do
           double(name: "rspec")
         ])
 
-        # Mock specs_for to return transitive dependencies
         allow(definition).to receive(:specs_for).with([:default]).and_return([
           rails_gem, activesupport_gem
         ])
 
         allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
 
-        # Generate SBOM without development group
-        sbom = described_class.generate_sbom("spdx", without_groups: [:development])
-
-        # Should have rails AND activesupport (transitive), but not rspec or diff-lcs
-        package_names = sbom["packages"].map { |p| p["name"] }
+        sbom = described_class.new(format: "spdx", without_groups: [:development]).generate
+        package_names = sbom.to_hash["packages"].map { |p| p["name"] }
         expect(package_names).to contain_exactly("rails", "activesupport")
       end
 
       it "excludes transitive dependencies of excluded groups" do
-        # Setup: rails (default) has no transitive deps
-        #        rspec (development) -> diff-lcs (transitive)
         rails_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
         rspec_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
         diff_lcs_gem = double(name: "diff-lcs", version: Gem::Version.new("1.5.0"))
@@ -298,25 +277,18 @@ RSpec.describe Bundler::Sbom::Generator do
           double(name: "rspec")
         ])
 
-        # Mock specs_for to return transitive dependencies
         allow(definition).to receive(:specs_for).with([:default]).and_return([
           rails_gem
         ])
 
         allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
 
-        # Generate SBOM without development group
-        sbom = described_class.generate_sbom("spdx", without_groups: [:development])
-
-        # Should only have rails, not rspec or its transitive dependency diff-lcs
-        package_names = sbom["packages"].map { |p| p["name"] }
+        sbom = described_class.new(format: "spdx", without_groups: [:development]).generate
+        package_names = sbom.to_hash["packages"].map { |p| p["name"] }
         expect(package_names).to contain_exactly("rails")
       end
 
       it "handles shared transitive dependencies correctly" do
-        # Setup: rails (default) -> activesupport (shared transitive)
-        #        rspec (development) -> activesupport (shared transitive)
-        #        minitest (test) has no transitive deps
         rails_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
         rspec_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
         minitest_gem = double(name: "minitest", version: Gem::Version.new("5.18.0"))
@@ -332,7 +304,6 @@ RSpec.describe Bundler::Sbom::Generator do
         allow(Bundler).to receive(:definition).and_return(definition)
         allow(definition).to receive(:groups).and_return([:default, :development, :test])
 
-        # Direct dependencies
         allow(definition).to receive(:dependencies_for).with(:default).and_return([
           double(name: "rails")
         ])
@@ -343,19 +314,14 @@ RSpec.describe Bundler::Sbom::Generator do
           double(name: "minitest")
         ])
 
-        # Mock specs_for: both default and test groups transitively depend on activesupport
         allow(definition).to receive(:specs_for).with([:default, :test]).and_return([
           rails_gem, minitest_gem, activesupport_gem
         ])
 
         allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
 
-        # Generate SBOM excluding development group
-        sbom = described_class.generate_sbom("spdx", without_groups: [:development])
-
-        # Should include rails, minitest, and activesupport (shared transitive)
-        # Should NOT include rspec (excluded group)
-        package_names = sbom["packages"].map { |p| p["name"] }
+        sbom = described_class.new(format: "spdx", without_groups: [:development]).generate
+        package_names = sbom.to_hash["packages"].map { |p| p["name"] }
         expect(package_names).to contain_exactly("rails", "minitest", "activesupport")
       end
     end
@@ -365,11 +331,12 @@ RSpec.describe Bundler::Sbom::Generator do
         allow(Bundler::LockfileParser).to receive(:new).and_return(
           double(specs: [])
         )
-        sbom = described_class.generate_sbom("cyclonedx")
-        expect(sbom["bomFormat"]).to eq("CycloneDX")
-        expect(sbom["specVersion"]).to eq("1.4")
-        expect(sbom["serialNumber"]).to match(/^urn:uuid:[0-9a-f-]+$/)
-        expect(sbom["components"]).to be_an(Array)
+        sbom = described_class.new(format: "cyclonedx").generate
+        expect(sbom).to be_a(Bundler::Sbom::CycloneDX)
+        expect(sbom.to_hash["bomFormat"]).to eq("CycloneDX")
+        expect(sbom.to_hash["specVersion"]).to eq("1.4")
+        expect(sbom.to_hash["serialNumber"]).to match(/^urn:uuid:[0-9a-f-]+$/)
+        expect(sbom.to_hash["components"]).to be_an(Array)
       end
 
       it "includes component information" do
@@ -379,8 +346,8 @@ RSpec.describe Bundler::Sbom::Generator do
         allow(Gem::Specification).to receive(:find_by_name)
           .with("rake", Gem::Version.new("13.0.6"))
           .and_return(rake_spec)
-        sbom = described_class.generate_sbom("cyclonedx")
-        component = sbom["components"].find { |c| c["name"] == "rake" }
+        sbom = described_class.new(format: "cyclonedx").generate
+        component = sbom.to_hash["components"].find { |c| c["name"] == "rake" }
         expect(component).not_to be_nil
         expect(component["name"]).to eq("rake")
         expect(component["version"]).to eq("13.0.6")
@@ -397,8 +364,8 @@ RSpec.describe Bundler::Sbom::Generator do
         allow(Gem::Specification).to receive(:find_by_name)
           .with("bundler", Gem::Version.new("2.4.0"))
           .and_return(multi_license_spec)
-        sbom = described_class.generate_sbom("cyclonedx")
-        component = sbom["components"].find { |c| c["name"] == "bundler" }
+        sbom = described_class.new(format: "cyclonedx").generate
+        component = sbom.to_hash["components"].find { |c| c["name"] == "bundler" }
         expect(component).not_to be_nil
         expect(component["licenses"].size).to eq(2)
         license_ids = component["licenses"].map { |l| l["license"]["id"] }
@@ -413,23 +380,22 @@ RSpec.describe Bundler::Sbom::Generator do
         allow(Gem::Specification).to receive(:find_by_name)
           .with("no-license", Gem::Version.new("1.0.0"))
           .and_return(empty_license_spec)
-        sbom = described_class.generate_sbom("cyclonedx")
-        component = sbom["components"].find { |c| c["name"] == "no-license" }
+        sbom = described_class.new(format: "cyclonedx").generate
+        component = sbom.to_hash["components"].find { |c| c["name"] == "no-license" }
         expect(component).not_to be_nil
         expect(component["licenses"]).to be_nil
       end
 
       it "includes metadata with timestamp and tools" do
         allow(Bundler::LockfileParser).to receive(:new).and_return(double(specs: []))
-        sbom = described_class.generate_sbom("cyclonedx")
-        expect(sbom["metadata"]).to be_a(Hash)
-        expect(sbom["metadata"]["timestamp"]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/)
-        expect(sbom["metadata"]["tools"]).to be_an(Array)
-        expect(sbom["metadata"]["tools"].first["name"]).to eq("bundle-sbom")
+        sbom = described_class.new(format: "cyclonedx").generate
+        expect(sbom.to_hash["metadata"]).to be_a(Hash)
+        expect(sbom.to_hash["metadata"]["timestamp"]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/)
+        expect(sbom.to_hash["metadata"]["tools"]).to be_an(Array)
+        expect(sbom.to_hash["metadata"]["tools"].first["name"]).to eq("bundle-sbom")
       end
 
       it "deduplicates gems with multiple platforms" do
-        # Simulate a gem with multiple platform entries in lockfile.specs
         specs_with_duplicates = [
           double(name: "herb", version: Gem::Version.new("1.0.0")),
           double(name: "herb", version: Gem::Version.new("1.0.0")),
@@ -442,22 +408,17 @@ RSpec.describe Bundler::Sbom::Generator do
         )
         allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
 
-        sbom = described_class.generate_sbom("cyclonedx")
+        sbom = described_class.new(format: "cyclonedx").generate
+        expect(sbom.to_hash["components"].size).to eq(2)
 
-        # Should only have 2 components, not 4
-        expect(sbom["components"].size).to eq(2)
-
-        # Verify herb appears only once
-        herb_components = sbom["components"].select { |c| c["name"] == "herb" }
+        herb_components = sbom.to_hash["components"].select { |c| c["name"] == "herb" }
         expect(herb_components.size).to eq(1)
 
-        # Verify rake appears only once
-        rake_components = sbom["components"].select { |c| c["name"] == "rake" }
+        rake_components = sbom.to_hash["components"].select { |c| c["name"] == "rake" }
         expect(rake_components.size).to eq(1)
       end
 
       it "filters out excluded groups" do
-        # Mock Bundler.definition
         development_gem = double(name: "rspec", version: Gem::Version.new("3.12.0"))
         production_gem = double(name: "rails", version: Gem::Version.new("7.0.0"))
 
@@ -467,7 +428,6 @@ RSpec.describe Bundler::Sbom::Generator do
           double(specs: all_specs)
         )
 
-        # Mock Bundler.definition
         definition = double
         allow(Bundler).to receive(:definition).and_return(definition)
         allow(definition).to receive(:groups).and_return([:default, :development])
@@ -480,12 +440,9 @@ RSpec.describe Bundler::Sbom::Generator do
 
         allow(Gem::Specification).to receive(:find_by_name).and_return(nil)
 
-        # Generate SBOM without development group
-        sbom = described_class.generate_sbom("cyclonedx", without_groups: [:development])
-
-        # Should only have rails, not rspec
-        expect(sbom["components"].size).to eq(1)
-        expect(sbom["components"].first["name"]).to eq("rails")
+        sbom = described_class.new(format: "cyclonedx", without_groups: [:development]).generate
+        expect(sbom.to_hash["components"].size).to eq(1)
+        expect(sbom.to_hash["components"].first["name"]).to eq("rails")
       end
     end
 
@@ -499,13 +456,13 @@ RSpec.describe Bundler::Sbom::Generator do
       it "raises error with message" do
         expect(Bundler.ui).to receive(:error).with("No Gemfile.lock found. Run `bundle install` first.")
         expect {
-          described_class.generate_sbom
+          described_class.new.generate
         }.to raise_error(Bundler::Sbom::GemfileLockNotFoundError, "No Gemfile.lock found")
       end
     end
   end
 
-  describe ".convert_to_xml" do
+  describe "#to_xml" do
     context "with SPDX format" do
       let(:sbom_hash) do
         {
@@ -533,7 +490,7 @@ RSpec.describe Bundler::Sbom::Generator do
               "supplier" => "NOASSERTION",
               "externalRefs" => [
                 {
-                  "referenceCategory" => "PACKAGE_MANAGER",
+                  "referenceCategory" => "PACKAGE-MANAGER",
                   "referenceType" => "purl",
                   "referenceLocator" => "pkg:gem/rake@13.0.6"
                 }
@@ -543,12 +500,12 @@ RSpec.describe Bundler::Sbom::Generator do
         }
       end
 
-      it "converts SBOM hash to XML format" do
-        xml_content = described_class.convert_to_xml(sbom_hash)
+      it "converts SBOM instance to XML format" do
+        sbom = Bundler::Sbom::SPDX.new(sbom_hash)
+        xml_content = sbom.to_xml
         expect(xml_content).to be_a(String)
         expect(xml_content).to include('<?xml version="1.0" encoding="UTF-8"?>')
 
-        # Parse XML to verify structure
         doc = REXML::Document.new(xml_content)
         root = doc.root
 
@@ -557,14 +514,12 @@ RSpec.describe Bundler::Sbom::Generator do
         expect(REXML::XPath.first(root, "spdxVersion").text).to eq("SPDX-2.3")
         expect(REXML::XPath.first(root, "name").text).to eq("test-project")
 
-        # Check package information
         package = REXML::XPath.first(root, "package")
         expect(package).not_to be_nil
         expect(REXML::XPath.first(package, "name").text).to eq("rake")
         expect(REXML::XPath.first(package, "versionInfo").text).to eq("13.0.6")
         expect(REXML::XPath.first(package, "licenseDeclared").text).to eq("MIT")
 
-        # Check external reference
         ext_ref = REXML::XPath.first(package, "externalRef")
         expect(ext_ref).not_to be_nil
         expect(REXML::XPath.first(ext_ref, "referenceLocator").text).to eq("pkg:gem/rake@13.0.6")
@@ -629,12 +584,12 @@ RSpec.describe Bundler::Sbom::Generator do
         }
       end
 
-      it "converts CycloneDX SBOM hash to XML format" do
-        xml_content = described_class.convert_to_xml(cyclonedx_hash)
+      it "converts CycloneDX SBOM instance to XML format" do
+        sbom = Bundler::Sbom::CycloneDX.new(cyclonedx_hash)
+        xml_content = sbom.to_xml
         expect(xml_content).to be_a(String)
         expect(xml_content).to include('<?xml version="1.0" encoding="UTF-8"?>')
 
-        # Parse XML to verify structure
         doc = REXML::Document.new(xml_content)
         root = doc.root
 
@@ -642,44 +597,37 @@ RSpec.describe Bundler::Sbom::Generator do
         expect(root.namespace).to include("cyclonedx.org/schema")
         expect(root.attributes["serialNumber"]).to eq("urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79")
 
-        # Check metadata
         metadata = REXML::XPath.first(root, "metadata")
         expect(metadata).not_to be_nil
         expect(REXML::XPath.first(metadata, "timestamp").text).to eq("2023-01-01T12:00:00Z")
 
-        # Check tools
         tools = REXML::XPath.first(metadata, "tools")
         expect(tools).not_to be_nil
         tool = REXML::XPath.first(tools, "tool")
         expect(tool).not_to be_nil
         expect(REXML::XPath.first(tool, "name").text).to eq("bundle-sbom")
 
-        # Check components
         components = REXML::XPath.first(root, "components")
         expect(components).not_to be_nil
         comps = REXML::XPath.each(components, "component").to_a
         expect(comps.size).to eq(2)
 
-        # Check first component
         comp1 = comps[0]
         expect(comp1.attributes["type"]).to eq("library")
         expect(REXML::XPath.first(comp1, "name").text).to eq("rake")
         expect(REXML::XPath.first(comp1, "version").text).to eq("13.0.6")
         expect(REXML::XPath.first(comp1, "purl").text).to eq("pkg:gem/rake@13.0.6")
 
-        # Check license in first component
         licenses1 = REXML::XPath.first(comp1, "licenses")
         expect(licenses1).not_to be_nil
         license1 = REXML::XPath.first(licenses1, "license")
         expect(license1).not_to be_nil
         expect(REXML::XPath.first(license1, "id").text).to eq("MIT")
 
-        # Check second component with multiple licenses
         comp2 = comps[1]
         expect(comp2.attributes["type"]).to eq("library")
         expect(REXML::XPath.first(comp2, "name").text).to eq("bundler")
 
-        # Check licenses in second component
         licenses2 = REXML::XPath.first(comp2, "licenses")
         expect(licenses2).not_to be_nil
         license_nodes = REXML::XPath.each(licenses2, "license").to_a
@@ -719,7 +667,7 @@ RSpec.describe Bundler::Sbom::Generator do
               <copyrightText>NOASSERTION</copyrightText>
               <supplier>NOASSERTION</supplier>
               <externalRef>
-                <referenceCategory>PACKAGE_MANAGER</referenceCategory>
+                <referenceCategory>PACKAGE-MANAGER</referenceCategory>
                 <referenceType>purl</referenceType>
                 <referenceLocator>pkg:gem/rake@13.0.6</referenceLocator>
               </externalRef>
@@ -728,36 +676,33 @@ RSpec.describe Bundler::Sbom::Generator do
         XML
       end
 
-      it "parses XML content into SBOM hash" do
+      it "parses XML content into SBOM instance" do
         sbom = described_class.parse_xml(xml_content)
 
-        expect(sbom).to be_a(Hash)
-        expect(sbom["SPDXID"]).to eq("SPDXRef-DOCUMENT")
-        expect(sbom["spdxVersion"]).to eq("SPDX-2.3")
-        expect(sbom["name"]).to eq("test-project")
-        expect(sbom["dataLicense"]).to eq("CC0-1.0")
+        expect(sbom).to be_a(Bundler::Sbom::SPDX)
+        expect(sbom.to_hash["SPDXID"]).to eq("SPDXRef-DOCUMENT")
+        expect(sbom.to_hash["spdxVersion"]).to eq("SPDX-2.3")
+        expect(sbom.to_hash["name"]).to eq("test-project")
+        expect(sbom.to_hash["dataLicense"]).to eq("CC0-1.0")
 
-        # Check creation info
-        expect(sbom["creationInfo"]).to be_a(Hash)
-        expect(sbom["creationInfo"]["created"]).to eq("2023-01-01T12:00:00Z")
-        expect(sbom["creationInfo"]["creators"]).to include("Tool: bundle-sbom")
+        expect(sbom.to_hash["creationInfo"]).to be_a(Hash)
+        expect(sbom.to_hash["creationInfo"]["created"]).to eq("2023-01-01T12:00:00Z")
+        expect(sbom.to_hash["creationInfo"]["creators"]).to include("Tool: bundle-sbom")
 
-        # Check packages
-        expect(sbom["packages"]).to be_an(Array)
-        expect(sbom["packages"].size).to eq(1)
+        expect(sbom.to_hash["packages"]).to be_an(Array)
+        expect(sbom.to_hash["packages"].size).to eq(1)
 
-        package = sbom["packages"].first
+        package = sbom.to_hash["packages"].first
         expect(package["SPDXID"]).to eq("SPDXRef-Package-rake")
         expect(package["name"]).to eq("rake")
         expect(package["versionInfo"]).to eq("13.0.6")
         expect(package["licenseDeclared"]).to eq("MIT")
 
-        # Check external refs
         expect(package["externalRefs"]).to be_an(Array)
         expect(package["externalRefs"].size).to eq(1)
 
         ext_ref = package["externalRefs"].first
-        expect(ext_ref["referenceCategory"]).to eq("PACKAGE_MANAGER")
+        expect(ext_ref["referenceCategory"]).to eq("PACKAGE-MANAGER")
         expect(ext_ref["referenceType"]).to eq("purl")
         expect(ext_ref["referenceLocator"]).to eq("pkg:gem/rake@13.0.6")
       end
@@ -811,31 +756,41 @@ RSpec.describe Bundler::Sbom::Generator do
         XML
       end
 
-      it "parses CycloneDX XML content and converts to Reporter-compatible format" do
+      it "parses CycloneDX XML content and returns CycloneDX instance" do
         sbom = described_class.parse_xml(cyclonedx_xml_content)
 
-        # The result should be converted to a Reporter-compatible format
-        expect(sbom).to be_a(Hash)
-        expect(sbom["packages"]).to be_an(Array)
-        expect(sbom["packages"].size).to eq(2)
+        expect(sbom).to be_a(Bundler::Sbom::CycloneDX)
+        expect(sbom.to_hash["bomFormat"]).to eq("CycloneDX")
+        expect(sbom.to_hash["components"]).to be_an(Array)
+        expect(sbom.to_hash["components"].size).to eq(2)
 
-        # Check first package
-        rake_package = sbom["packages"].find { |p| p["name"] == "rake" }
-        expect(rake_package).not_to be_nil
-        expect(rake_package["versionInfo"]).to eq("13.0.6")
-        expect(rake_package["licenseDeclared"]).to eq("MIT")
+        rake_comp = sbom.to_hash["components"].find { |c| c["name"] == "rake" }
+        expect(rake_comp).not_to be_nil
+        expect(rake_comp["version"]).to eq("13.0.6")
+        expect(rake_comp["licenses"]).to eq([{"license" => {"id" => "MIT"}}])
 
-        # Check second package with multiple licenses
-        bundler_package = sbom["packages"].find { |p| p["name"] == "bundler" }
-        expect(bundler_package).not_to be_nil
-        expect(bundler_package["versionInfo"]).to eq("2.4.0")
-        expect(bundler_package["licenseDeclared"]).to eq("MIT, Apache-2.0")
+        bundler_comp = sbom.to_hash["components"].find { |c| c["name"] == "bundler" }
+        expect(bundler_comp).not_to be_nil
+        expect(bundler_comp["version"]).to eq("2.4.0")
+        expect(bundler_comp["licenses"]).to eq([{"license" => {"id" => "MIT"}}, {"license" => {"id" => "Apache-2.0"}}])
       end
     end
 
     it "handles malformed XML gracefully" do
       malformed_xml = "<invalid>XML Content"
       expect { described_class.parse_xml(malformed_xml) }.to raise_error(REXML::ParseException)
+    end
+  end
+
+  describe ".from_hash" do
+    it "returns SPDX instance for SPDX hash" do
+      sbom = described_class.from_hash({"SPDXID" => "SPDXRef-DOCUMENT", "packages" => []})
+      expect(sbom).to be_a(Bundler::Sbom::SPDX)
+    end
+
+    it "returns CycloneDX instance for CycloneDX hash" do
+      sbom = described_class.from_hash({"bomFormat" => "CycloneDX", "components" => []})
+      expect(sbom).to be_a(Bundler::Sbom::CycloneDX)
     end
   end
 end

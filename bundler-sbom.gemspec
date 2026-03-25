@@ -6,7 +6,7 @@ Gem::Specification.new do |spec|
   spec.authors = ["SHIBATA Hiroshi"]
   spec.email = ["hsbt@ruby-lang.org"]
 
-  spec.summary = "Generate SPDX SBOM(Software Bill of Materials) files with Bundler"
+  spec.summary = "Generate SBOM(Software Bill of Materials) files with Bundler"
   spec.description = spec.summary
   spec.homepage = "https://github.com/hsbt/bundler-sbom"
   spec.license = "MIT"
@@ -23,6 +23,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "bundler", ">= 2.0"
   spec.add_dependency "rexml"
+  spec.add_dependency "spdx-licenses"
 
   spec.metadata = {
     "homepage_uri" => spec.homepage,

@@ -1,12 +1,15 @@
 require "bundler"
 require "securerandom"
-require "rexml/document"
+require "spdx-licenses"
+require "bundler/sbom/sbom_document"
 
 module Bundler
   module Sbom
     class SPDX
-      def self.generate(gems, document_name)
-        spdx_id = generate_spdx_id
+      include SbomDocument
+
+      def self.generate(gem_data, document_name)
+        spdx_id = SecureRandom.uuid
         sbom = {
           "SPDXID" => "SPDXRef-DOCUMENT",
           "spdxVersion" => "SPDX-2.3",
@@ -21,20 +24,15 @@ module Bundler
           "packages" => []
         }
 
-        # Deduplicate specs by name and version
-        seen_gems = Set.new
-        gems.each do |spec|
-          gem_key = "#{spec.name}:#{spec.version}"
-          next if seen_gems.include?(gem_key)
-          seen_gems.add(gem_key)
-          licenses = SpecLicenseFinder.find_licenses(spec)
-          license_string = licenses.empty? ? "NOASSERTION" : licenses.join(", ")
+        gem_data.each do |gem|
+          spdx_licenses = gem[:licenses].map { |l| normalize_license_id(l) }
+          license_string = spdx_licenses.empty? ? "NOASSERTION" : spdx_licenses.join(" AND ")
 
           package = {
-            "SPDXID" => "SPDXRef-Package-#{spec.name}",
-            "name" => spec.name,
-            "versionInfo" => spec.version.to_s,
-            "downloadLocation" => "NOASSERTION",
+            "SPDXID" => "SPDXRef-Package-#{gem[:name]}",
+            "name" => gem[:name],
+            "versionInfo" => gem[:version],
+            "downloadLocation" => "https://rubygems.org/gems/#{gem[:name]}/versions/#{gem[:version]}",
             "filesAnalyzed" => false,
             "licenseConcluded" => license_string,
             "licenseDeclared" => license_string,
@@ -42,9 +40,9 @@ module Bundler
             "supplier" => "NOASSERTION",
             "externalRefs" => [
               {
-                "referenceCategory" => "PACKAGE_MANAGER",
+                "referenceCategory" => "PACKAGE-MANAGER",
                 "referenceType" => "purl",
-                "referenceLocator" => "pkg:gem/#{spec.name}@#{spec.version}"
+                "referenceLocator" => "pkg:gem/#{gem[:name]}@#{gem[:version]}"
               }
             ]
           }
@@ -52,73 +50,14 @@ module Bundler
         end
 
         sbom["documentDescribes"] = sbom["packages"].map { |p| p["SPDXID"] }
-        sbom
-      end
-
-      def self.to_xml(sbom)
-        doc = REXML::Document.new
-        doc << REXML::XMLDecl.new("1.0", "UTF-8")
-
-        # Root element
-        root = REXML::Element.new("SpdxDocument")
-        root.add_namespace("https://spdx.org/spdxdocs/")
-        doc.add_element(root)
-
-        # Document info
-        add_element(root, "SPDXID", sbom["SPDXID"])
-        add_element(root, "spdxVersion", sbom["spdxVersion"])
-        add_element(root, "name", sbom["name"])
-        add_element(root, "dataLicense", sbom["dataLicense"])
-        add_element(root, "documentNamespace", sbom["documentNamespace"])
-
-        # Creation info
-        creation_info = REXML::Element.new("creationInfo")
-        root.add_element(creation_info)
-        add_element(creation_info, "created", sbom["creationInfo"]["created"])
-        add_element(creation_info, "licenseListVersion", sbom["creationInfo"]["licenseListVersion"])
-
-        sbom["creationInfo"]["creators"].each do |creator|
-          add_element(creation_info, "creator", creator)
+        sbom["relationships"] = sbom["packages"].map do |p|
+          {
+            "spdxElementId" => "SPDXRef-DOCUMENT",
+            "relatedSpdxElement" => p["SPDXID"],
+            "relationshipType" => "DESCRIBES"
+          }
         end
-
-        # Describes
-        sbom["documentDescribes"].each do |describes|
-          add_element(root, "documentDescribes", describes)
-        end
-
-        # Packages
-        sbom["packages"].each do |pkg|
-          package = REXML::Element.new("package")
-          root.add_element(package)
-
-          add_element(package, "SPDXID", pkg["SPDXID"])
-          add_element(package, "name", pkg["name"])
-          add_element(package, "versionInfo", pkg["versionInfo"])
-          add_element(package, "downloadLocation", pkg["downloadLocation"])
-          add_element(package, "filesAnalyzed", pkg["filesAnalyzed"].to_s)
-          add_element(package, "licenseConcluded", pkg["licenseConcluded"])
-          add_element(package, "licenseDeclared", pkg["licenseDeclared"])
-          add_element(package, "copyrightText", pkg["copyrightText"])
-          add_element(package, "supplier", pkg["supplier"])
-
-          # External references
-          if pkg["externalRefs"]
-            pkg["externalRefs"].each do |ref|
-              ext_ref = REXML::Element.new("externalRef")
-              package.add_element(ext_ref)
-
-              add_element(ext_ref, "referenceCategory", ref["referenceCategory"])
-              add_element(ext_ref, "referenceType", ref["referenceType"])
-              add_element(ext_ref, "referenceLocator", ref["referenceLocator"])
-            end
-          end
-        end
-
-        formatter = REXML::Formatters::Pretty.new(2)
-        formatter.compact = true
-        output = ""
-        formatter.write(doc, output)
-        output.sub(%r{<\?xml version='1\.0' encoding='UTF-8'\?>}, '<?xml version="1.0" encoding="UTF-8"?>')
+        new(sbom)
       end
 
       def self.parse_xml(doc)
@@ -136,20 +75,18 @@ module Bundler
             "creators" => []
           },
           "packages" => [],
-          "documentDescribes" => []
+          "documentDescribes" => [],
+          "relationships" => []
         }
 
-        # Collect creators
         REXML::XPath.each(root, "creationInfo/creator") do |creator|
           sbom["creationInfo"]["creators"] << creator.text
         end
 
-        # Collect documentDescribes
         REXML::XPath.each(root, "documentDescribes") do |describes|
           sbom["documentDescribes"] << describes.text
         end
 
-        # Collect packages
         REXML::XPath.each(root, "package") do |pkg_element|
           package = {
             "SPDXID" => get_element_text(pkg_element, "SPDXID"),
@@ -164,7 +101,6 @@ module Bundler
             "externalRefs" => []
           }
 
-          # Collect external references
           REXML::XPath.each(pkg_element, "externalRef") do |ref_element|
             ref = {
               "referenceCategory" => get_element_text(ref_element, "referenceCategory"),
@@ -177,14 +113,114 @@ module Bundler
           sbom["packages"] << package
         end
 
-        sbom
+        REXML::XPath.each(root, "relationship") do |rel_element|
+          sbom["relationships"] << {
+            "spdxElementId" => get_element_text(rel_element, "spdxElementId"),
+            "relatedSpdxElement" => get_element_text(rel_element, "relatedSpdxElement"),
+            "relationshipType" => get_element_text(rel_element, "relationshipType")
+          }
+        end
+
+        new(sbom)
       end
 
-      def self.to_report_format(sbom)
-        # SPDXフォーマットは既にレポート形式と互換性があるため、
-        # packagesセクションだけを抽出して返す
+      def to_xml
+        doc = REXML::Document.new
+        doc << REXML::XMLDecl.new("1.0", "UTF-8")
+
+        root = REXML::Element.new("SpdxDocument")
+        root.add_namespace("https://spdx.org/spdxdocs/")
+        doc.add_element(root)
+
+        add_element(root, "SPDXID", @data["SPDXID"])
+        add_element(root, "spdxVersion", @data["spdxVersion"])
+        add_element(root, "name", @data["name"])
+        add_element(root, "dataLicense", @data["dataLicense"])
+        add_element(root, "documentNamespace", @data["documentNamespace"])
+
+        creation_info = REXML::Element.new("creationInfo")
+        root.add_element(creation_info)
+        add_element(creation_info, "created", @data["creationInfo"]["created"])
+        add_element(creation_info, "licenseListVersion", @data["creationInfo"]["licenseListVersion"])
+
+        @data["creationInfo"]["creators"].each do |creator|
+          add_element(creation_info, "creator", creator)
+        end
+
+        @data["documentDescribes"].each do |describes|
+          add_element(root, "documentDescribes", describes)
+        end
+
+        @data["packages"].each do |pkg|
+          package = REXML::Element.new("package")
+          root.add_element(package)
+
+          add_element(package, "SPDXID", pkg["SPDXID"])
+          add_element(package, "name", pkg["name"])
+          add_element(package, "versionInfo", pkg["versionInfo"])
+          add_element(package, "downloadLocation", pkg["downloadLocation"])
+          add_element(package, "filesAnalyzed", pkg["filesAnalyzed"].to_s)
+          add_element(package, "licenseConcluded", pkg["licenseConcluded"])
+          add_element(package, "licenseDeclared", pkg["licenseDeclared"])
+          add_element(package, "copyrightText", pkg["copyrightText"])
+          add_element(package, "supplier", pkg["supplier"])
+
+          if pkg["externalRefs"]
+            pkg["externalRefs"].each do |ref|
+              ext_ref = REXML::Element.new("externalRef")
+              package.add_element(ext_ref)
+
+              add_element(ext_ref, "referenceCategory", ref["referenceCategory"])
+              add_element(ext_ref, "referenceType", ref["referenceType"])
+              add_element(ext_ref, "referenceLocator", ref["referenceLocator"])
+            end
+          end
+        end
+
+        if @data["relationships"]
+          @data["relationships"].each do |rel|
+            relationship = REXML::Element.new("relationship")
+            root.add_element(relationship)
+
+            add_element(relationship, "spdxElementId", rel["spdxElementId"])
+            add_element(relationship, "relatedSpdxElement", rel["relatedSpdxElement"])
+            add_element(relationship, "relationshipType", rel["relationshipType"])
+          end
+        end
+
+        format_xml(doc)
+      end
+
+      DEPRECATED_LICENSE_MAP = {
+        "AGPL-3.0" => "AGPL-3.0-only",
+        "GPL-2.0" => "GPL-2.0-only",
+        "GPL-3.0" => "GPL-3.0-only",
+        "LGPL-2.1" => "LGPL-2.1-only",
+        "LGPL-3.0" => "LGPL-3.0-only",
+      }.freeze
+
+      private
+
+      def self.normalize_license_id(license_id)
+        if mapped = DEPRECATED_LICENSE_MAP[license_id]
+          return mapped
+        end
+
+        return license_id if SpdxLicenses.exist?(license_id)
+
+        if license_id.start_with?("LicenseRef-")
+          license_id
+        else
+          "LicenseRef-#{license_id}"
+        end
+      end
+      private_class_method :normalize_license_id
+
+      public
+
+      def to_report_format
         {
-          "packages" => sbom["packages"].map do |pkg|
+          "packages" => @data["packages"].map do |pkg|
             {
               "name" => pkg["name"],
               "versionInfo" => pkg["versionInfo"],
@@ -192,21 +228,6 @@ module Bundler
             }
           end
         }
-      end
-
-      def self.generate_spdx_id
-        SecureRandom.uuid
-      end
-
-      def self.add_element(parent, name, value)
-        element = REXML::Element.new(name)
-        element.text = value
-        parent.add_element(element)
-      end
-
-      def self.get_element_text(element, xpath)
-        result = REXML::XPath.first(element, xpath)
-        result ? result.text : nil
       end
     end
   end

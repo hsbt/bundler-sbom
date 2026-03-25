@@ -9,4 +9,5 @@ group :development do
   gem "simplecov", require: false
   gem "rspec-its"
   gem "rspec-mocks"
+  gem "json_schemer"
 end

@@ -65,11 +65,19 @@ Note: The `license` command requires that you've already generated the SBOM usin
 
 ## Supported SBOM Formats
 
-### SPDX
+### SPDX (v2.3)
 [SPDX (Software Package Data Exchange)](https://spdx.dev/) is a standard format for communicating software bill of material information, including components, licenses, copyrights, and security references.
 
-### CycloneDX
+- Spec version: [SPDX 2.3](https://spdx.github.io/spdx-spec/v2.3/)
+- Output formats: JSON, XML
+- License identifiers are validated against the [SPDX License List](https://spdx.org/licenses/) via the `spdx-licenses` gem. Non-SPDX licenses are output as `LicenseRef-` identifiers, and deprecated SPDX IDs (e.g., `GPL-2.0`) are mapped to their current equivalents (e.g., `GPL-2.0-only`).
+
+### CycloneDX (v1.4)
 [CycloneDX](https://cyclonedx.org/) is a lightweight SBOM specification designed for use in application security contexts and supply chain component analysis.
+
+- Spec version: [CycloneDX 1.4](https://cyclonedx.org/docs/1.4/json/)
+- Output formats: JSON, XML
+- SPDX license IDs are placed in the `license.id` field, and non-SPDX licenses use the `license.name` field, per the CycloneDX specification.
 
 ## References
 
