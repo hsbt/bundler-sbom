@@ -167,6 +167,19 @@ RSpec.describe Bundler::Sbom::CycloneDX do
                 }
               }
             ]
+          },
+          {
+            "type" => "library",
+            "name" => "custom-gem",
+            "version" => "1.0.0",
+            "purl" => "pkg:gem/custom-gem@1.0.0",
+            "licenses" => [
+              {
+                "license" => {
+                  "name" => "Custom License"
+                }
+              }
+            ]
           }
         ]
       }
@@ -198,7 +211,7 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       components = REXML::XPath.first(root, "components")
       expect(components).not_to be_nil
       comps = REXML::XPath.each(components, "component").to_a
-      expect(comps.size).to eq(2)
+      expect(comps.size).to eq(3)
 
       comp1 = comps[0]
       expect(comp1.attributes["type"]).to eq("library")
@@ -223,6 +236,13 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       license_ids = license_nodes.map { |node| REXML::XPath.first(node, "id").text }
       expect(license_ids).to include("MIT")
       expect(license_ids).to include("Apache-2.0")
+
+      comp3 = comps[2]
+      expect(REXML::XPath.first(comp3, "name").text).to eq("custom-gem")
+      licenses3 = REXML::XPath.first(comp3, "licenses")
+      license3 = REXML::XPath.first(licenses3, "license")
+      expect(REXML::XPath.first(license3, "name").text).to eq("Custom License")
+      expect(REXML::XPath.first(license3, "id")).to be_nil
     end
   end
 
@@ -269,6 +289,16 @@ RSpec.describe Bundler::Sbom::CycloneDX do
                 </license>
               </licenses>
             </component>
+            <component type="library">
+              <name>custom-gem</name>
+              <version>1.0.0</version>
+              <purl>pkg:gem/custom-gem@1.0.0</purl>
+              <licenses>
+                <license>
+                  <name>Custom License</name>
+                </license>
+              </licenses>
+            </component>
           </components>
         </bom>
       XML
@@ -281,7 +311,7 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       expect(sbom).to be_a(described_class)
       expect(sbom.to_hash["bomFormat"]).to eq("CycloneDX")
       expect(sbom.to_hash["components"]).to be_an(Array)
-      expect(sbom.to_hash["components"].size).to eq(2)
+      expect(sbom.to_hash["components"].size).to eq(3)
 
       rake_comp = sbom.to_hash["components"].find { |c| c["name"] == "rake" }
       expect(rake_comp).not_to be_nil
@@ -292,6 +322,10 @@ RSpec.describe Bundler::Sbom::CycloneDX do
       expect(bundler_comp).not_to be_nil
       expect(bundler_comp["version"]).to eq("2.4.0")
       expect(bundler_comp["licenses"]).to eq([{"license" => {"id" => "MIT"}}, {"license" => {"id" => "Apache-2.0"}}])
+
+      custom_comp = sbom.to_hash["components"].find { |c| c["name"] == "custom-gem" }
+      expect(custom_comp).not_to be_nil
+      expect(custom_comp["licenses"]).to eq([{"license" => {"name" => "Custom License"}}])
     end
   end
 end
