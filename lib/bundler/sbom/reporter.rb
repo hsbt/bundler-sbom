@@ -27,11 +27,7 @@ module Bundler
         Bundler.ui.info "\n=== Packages by License ==="
         sorted_licenses.each do |license, _|
           packages = report["packages"].select do |package|
-            if package["licenseDeclared"].include?(",")
-              package["licenseDeclared"].split(",").map(&:strip).include?(license)
-            else
-              package["licenseDeclared"] == license
-            end
+            split_licenses(package["licenseDeclared"]).include?(license)
           end
 
           Bundler.ui.info "\n#{license} (#{packages.size} package(s)):"
@@ -44,12 +40,15 @@ module Bundler
       def analyze_licenses(report)
         license_count = Hash.new(0)
         report["packages"].each do |package|
-          licenses = package["licenseDeclared"].split(",").map(&:strip)
-          licenses.each do |license|
+          split_licenses(package["licenseDeclared"]).each do |license|
             license_count[license] += 1
           end
         end
         license_count
+      end
+
+      def split_licenses(license_declared)
+        license_declared.split(/ AND |, /).map(&:strip)
       end
     end
   end

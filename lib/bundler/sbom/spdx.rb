@@ -24,7 +24,7 @@ module Bundler
         }
 
         gem_data.each do |gem|
-          license_string = gem[:licenses].empty? ? "NOASSERTION" : gem[:licenses].join(", ")
+          license_string = gem[:licenses].empty? ? "NOASSERTION" : gem[:licenses].join(" AND ")
 
           package = {
             "SPDXID" => "SPDXRef-Package-#{gem[:name]}",

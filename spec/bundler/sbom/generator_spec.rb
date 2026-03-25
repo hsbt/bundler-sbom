@@ -125,7 +125,7 @@ RSpec.describe Bundler::Sbom::Generator do
         sbom = described_class.new.generate
         package = sbom.to_hash["packages"].find { |p| p["name"] == "bundler" }
         expect(package).not_to be_nil
-        expect(package["licenseDeclared"]).to eq("MIT, Apache-2.0")
+        expect(package["licenseDeclared"]).to eq("MIT AND Apache-2.0")
       end
 
       it "sets NOASSERTION for packages with no license information" do
