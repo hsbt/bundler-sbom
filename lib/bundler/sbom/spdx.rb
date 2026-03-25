@@ -1,5 +1,6 @@
 require "bundler"
 require "securerandom"
+require "set"
 require "bundler/sbom/sbom_document"
 
 module Bundler

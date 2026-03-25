@@ -1,4 +1,5 @@
 require "bundler"
+require "set"
 require "rexml/document"
 require "bundler/sbom/spdx"
 require "bundler/sbom/cyclonedx"
