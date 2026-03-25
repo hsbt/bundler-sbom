@@ -195,7 +195,7 @@ module Bundler
         mapped = SPDX::DEPRECATED_LICENSE_MAP[license]
         license = mapped if mapped
 
-        if SPDX::KNOWN_SPDX_IDS.include?(license)
+        if SpdxLicenses.exist?(license)
           {"license" => {"id" => license}}
         else
           {"license" => {"name" => license}}

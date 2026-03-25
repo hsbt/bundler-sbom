@@ -1,6 +1,6 @@
 require "bundler"
 require "securerandom"
-require "set"
+require "spdx-licenses"
 require "bundler/sbom/sbom_document"
 
 module Bundler
@@ -191,42 +191,6 @@ module Bundler
         format_xml(doc)
       end
 
-      KNOWN_SPDX_IDS = %w[
-        0BSD AAL AFL-3.0 AGPL-1.0-only AGPL-1.0-or-later AGPL-3.0-only AGPL-3.0-or-later
-        Apache-1.0 Apache-1.1 Apache-2.0 APSL-1.0 APSL-1.1 APSL-2.0
-        Artistic-1.0 Artistic-2.0
-        Beerware BlueOak-1.0.0 BSL-1.0
-        BSD-1-Clause BSD-2-Clause BSD-3-Clause BSD-3-Clause-LBNL
-        CAL-1.0 CAL-1.0-Combined-Work-Exception
-        CC-BY-1.0 CC-BY-2.0 CC-BY-2.5 CC-BY-3.0 CC-BY-4.0
-        CC-BY-NC-1.0 CC-BY-NC-2.0 CC-BY-NC-2.5 CC-BY-NC-3.0 CC-BY-NC-4.0
-        CC-BY-NC-ND-1.0 CC-BY-NC-ND-2.0 CC-BY-NC-ND-2.5 CC-BY-NC-ND-3.0 CC-BY-NC-ND-4.0
-        CC-BY-NC-SA-1.0 CC-BY-NC-SA-2.0 CC-BY-NC-SA-2.5 CC-BY-NC-SA-3.0 CC-BY-NC-SA-4.0
-        CC-BY-ND-1.0 CC-BY-ND-2.0 CC-BY-ND-2.5 CC-BY-ND-3.0 CC-BY-ND-4.0
-        CC-BY-SA-1.0 CC-BY-SA-2.0 CC-BY-SA-2.5 CC-BY-SA-3.0 CC-BY-SA-4.0
-        CC0-1.0 CDDL-1.0 CDDL-1.1 CECILL-2.1
-        CPL-1.0 CUA-OPL-1.0
-        ECL-1.0 ECL-2.0 EFL-1.0 EFL-2.0 Entessa EPL-1.0 EPL-2.0 EUDatagrid EUPL-1.1 EUPL-1.2
-        FSFAP FTPL
-        GPL-2.0-only GPL-2.0-or-later GPL-3.0-only GPL-3.0-or-later
-        ICU ISC
-        JSON
-        LAL-1.2 LAL-1.3 Latex2e LGPL-2.1-only LGPL-2.1-or-later LGPL-3.0-only LGPL-3.0-or-later
-        LiLiQ-P-1.1 LiLiQ-R-1.1 LiLiQ-Rplus-1.1 LPL-1.0 LPL-1.02 LPPL-1.0 LPPL-1.1 LPPL-1.2 LPPL-1.3a LPPL-1.3c
-        MIT MIT-0 MPL-1.0 MPL-1.1 MPL-2.0 MPL-2.0-no-copyleft-exception MS-PL MS-RL MulanPSL-2.0
-        NCSA Nokia NOASSERTION NONE NPOSL-3.0 NTP
-        OGTSL OLDAP-2.8 OFL-1.0 OFL-1.1 OFL-1.1-RFN OSET-PL-2.1 OSL-1.0 OSL-2.0 OSL-2.1 OSL-3.0
-        PHP-3.0 PHP-3.01 PostgreSQL PSF-2.0 Python-2.0
-        QPL-1.0
-        RPL-1.1 RPL-1.5 RPSL-1.0 RSCPL Ruby
-        SimPL-2.0 SISSL SleepyCat SPL-1.0
-        UCL-1.0 Unicode-DFS-2016 Unlicense UPL-1.0
-        Vim VSL-1.0
-        W3C Watcom-1.0 WTFPL
-        Xnet
-        Zlib ZPL-2.0 ZPL-2.1
-      ].to_set.freeze
-
       DEPRECATED_LICENSE_MAP = {
         "AGPL-3.0" => "AGPL-3.0-only",
         "GPL-2.0" => "GPL-2.0-only",
@@ -238,11 +202,11 @@ module Bundler
       private
 
       def self.normalize_license_id(license_id)
-        return license_id if KNOWN_SPDX_IDS.include?(license_id)
-
         if mapped = DEPRECATED_LICENSE_MAP[license_id]
           return mapped
         end
+
+        return license_id if SpdxLicenses.exist?(license_id)
 
         if license_id.start_with?("LicenseRef-")
           license_id

@@ -70,7 +70,7 @@ Note: The `license` command requires that you've already generated the SBOM usin
 
 - Spec version: [SPDX 2.3](https://spdx.github.io/spdx-spec/v2.3/)
 - Output formats: JSON, XML
-- License identifiers are validated against a curated subset of the [SPDX License List](https://spdx.org/licenses/). Identifiers not in this subset are treated as non-SPDX and output as `LicenseRef-` identifiers, and deprecated SPDX IDs (e.g., `GPL-2.0`) are mapped to their current equivalents (e.g., `GPL-2.0-only`).
+- License identifiers are validated against the [SPDX License List](https://spdx.org/licenses/) via the `spdx-licenses` gem. Non-SPDX licenses are output as `LicenseRef-` identifiers, and deprecated SPDX IDs (e.g., `GPL-2.0`) are mapped to their current equivalents (e.g., `GPL-2.0-only`).
 
 ### CycloneDX (v1.4)
 [CycloneDX](https://cyclonedx.org/) is a lightweight SBOM specification designed for use in application security contexts and supply chain component analysis.

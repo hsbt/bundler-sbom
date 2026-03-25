@@ -23,6 +23,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "bundler", ">= 2.0"
   spec.add_dependency "rexml"
+  spec.add_dependency "spdx-licenses"
 
   spec.metadata = {
     "homepage_uri" => spec.homepage,
