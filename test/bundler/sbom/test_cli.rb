@@ -42,19 +42,24 @@ class Bundler::Sbom::CLITest < Minitest::Test
 
   def test_dump_default_format_generates_spdx_json
     spdx_instance = Bundler::Sbom::SPDX.new(sample_spdx_sbom)
-    mock_generator = Minitest::Mock.new
-    mock_generator.expect(:generate, spdx_instance)
+    received_args = nil
+    fake_new = proc do |**kwargs|
+      received_args = kwargs
+      mock_gen = Minitest::Mock.new
+      mock_gen.expect(:generate, spdx_instance)
+      mock_gen
+    end
 
     out = nil
-    Bundler::Sbom::Generator.stub(:new, mock_generator) do
+    Bundler::Sbom::Generator.stub(:new, fake_new) do
       out, = capture_io { Bundler::Sbom::CLI.start(%w[dump]) }
     end
 
+    assert_equal({format: "spdx", without_groups: []}, received_args)
     assert File.exist?("bom.json"), "bom.json should be created"
     parsed = JSON.parse(File.read("bom.json"))
     assert_equal sample_spdx_sbom, parsed
     assert_match(/Generated SPDX SBOM at bom\.json/, out)
-    mock_generator.verify
   end
 
   def test_dump_xml_format_generates_spdx_xml
@@ -62,35 +67,45 @@ class Bundler::Sbom::CLITest < Minitest::Test
     xml_output = "<xml>spdx</xml>"
     spdx_instance.define_singleton_method(:to_xml) { xml_output }
 
-    mock_generator = Minitest::Mock.new
-    mock_generator.expect(:generate, spdx_instance)
+    received_args = nil
+    fake_new = proc do |**kwargs|
+      received_args = kwargs
+      mock_gen = Minitest::Mock.new
+      mock_gen.expect(:generate, spdx_instance)
+      mock_gen
+    end
 
     out = nil
-    Bundler::Sbom::Generator.stub(:new, mock_generator) do
+    Bundler::Sbom::Generator.stub(:new, fake_new) do
       out, = capture_io { Bundler::Sbom::CLI.start(%w[dump --format xml]) }
     end
 
+    assert_equal({format: "spdx", without_groups: []}, received_args)
     assert File.exist?("bom.xml"), "bom.xml should be created"
     assert_equal xml_output, File.read("bom.xml")
     assert_match(/Generated SPDX SBOM at bom\.xml/, out)
-    mock_generator.verify
   end
 
   def test_dump_cyclonedx_json
     cyclonedx_instance = Bundler::Sbom::CycloneDX.new(sample_cyclonedx_sbom)
-    mock_generator = Minitest::Mock.new
-    mock_generator.expect(:generate, cyclonedx_instance)
+    received_args = nil
+    fake_new = proc do |**kwargs|
+      received_args = kwargs
+      mock_gen = Minitest::Mock.new
+      mock_gen.expect(:generate, cyclonedx_instance)
+      mock_gen
+    end
 
     out = nil
-    Bundler::Sbom::Generator.stub(:new, mock_generator) do
+    Bundler::Sbom::Generator.stub(:new, fake_new) do
       out, = capture_io { Bundler::Sbom::CLI.start(%w[dump --sbom cyclonedx]) }
     end
 
+    assert_equal({format: "cyclonedx", without_groups: []}, received_args)
     assert File.exist?("bom-cyclonedx.json"), "bom-cyclonedx.json should be created"
     parsed = JSON.parse(File.read("bom-cyclonedx.json"))
     assert_equal sample_cyclonedx_sbom, parsed
     assert_match(/Generated CYCLONEDX SBOM at bom-cyclonedx\.json/, out)
-    mock_generator.verify
   end
 
   def test_dump_cyclonedx_xml
@@ -98,18 +113,23 @@ class Bundler::Sbom::CLITest < Minitest::Test
     xml_output = "<xml>cyclonedx</xml>"
     cyclonedx_instance.define_singleton_method(:to_xml) { xml_output }
 
-    mock_generator = Minitest::Mock.new
-    mock_generator.expect(:generate, cyclonedx_instance)
+    received_args = nil
+    fake_new = proc do |**kwargs|
+      received_args = kwargs
+      mock_gen = Minitest::Mock.new
+      mock_gen.expect(:generate, cyclonedx_instance)
+      mock_gen
+    end
 
     out = nil
-    Bundler::Sbom::Generator.stub(:new, mock_generator) do
+    Bundler::Sbom::Generator.stub(:new, fake_new) do
       out, = capture_io { Bundler::Sbom::CLI.start(%w[dump --format xml --sbom cyclonedx]) }
     end
 
+    assert_equal({format: "cyclonedx", without_groups: []}, received_args)
     assert File.exist?("bom-cyclonedx.xml"), "bom-cyclonedx.xml should be created"
     assert_equal xml_output, File.read("bom-cyclonedx.xml")
     assert_match(/Generated CYCLONEDX SBOM at bom-cyclonedx\.xml/, out)
-    mock_generator.verify
   end
 
   def test_dump_invalid_output_format_exits
