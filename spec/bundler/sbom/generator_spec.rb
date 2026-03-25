@@ -490,7 +490,7 @@ RSpec.describe Bundler::Sbom::Generator do
               "supplier" => "NOASSERTION",
               "externalRefs" => [
                 {
-                  "referenceCategory" => "PACKAGE_MANAGER",
+                  "referenceCategory" => "PACKAGE-MANAGER",
                   "referenceType" => "purl",
                   "referenceLocator" => "pkg:gem/rake@13.0.6"
                 }
@@ -667,7 +667,7 @@ RSpec.describe Bundler::Sbom::Generator do
               <copyrightText>NOASSERTION</copyrightText>
               <supplier>NOASSERTION</supplier>
               <externalRef>
-                <referenceCategory>PACKAGE_MANAGER</referenceCategory>
+                <referenceCategory>PACKAGE-MANAGER</referenceCategory>
                 <referenceType>purl</referenceType>
                 <referenceLocator>pkg:gem/rake@13.0.6</referenceLocator>
               </externalRef>
@@ -702,7 +702,7 @@ RSpec.describe Bundler::Sbom::Generator do
         expect(package["externalRefs"].size).to eq(1)
 
         ext_ref = package["externalRefs"].first
-        expect(ext_ref["referenceCategory"]).to eq("PACKAGE_MANAGER")
+        expect(ext_ref["referenceCategory"]).to eq("PACKAGE-MANAGER")
         expect(ext_ref["referenceType"]).to eq("purl")
         expect(ext_ref["referenceLocator"]).to eq("pkg:gem/rake@13.0.6")
       end

@@ -72,6 +72,30 @@ RSpec.describe Bundler::Sbom::SPDX do
       expect(package["licenseDeclared"]).to eq("MIT AND Apache-2.0")
     end
 
+    it "normalizes non-SPDX license IDs to LicenseRef- format" do
+      gem_data = [{name: "my-gem", version: "1.0.0", licenses: ["Nonstandard"]}]
+      sbom = described_class.generate(gem_data, "test-project")
+
+      package = sbom.to_hash["packages"].find { |p| p["name"] == "my-gem" }
+      expect(package["licenseDeclared"]).to eq("LicenseRef-Nonstandard")
+    end
+
+    it "maps deprecated SPDX license IDs to current equivalents" do
+      gem_data = [{name: "my-gem", version: "1.0.0", licenses: ["GPL-2.0"]}]
+      sbom = described_class.generate(gem_data, "test-project")
+
+      package = sbom.to_hash["packages"].find { |p| p["name"] == "my-gem" }
+      expect(package["licenseDeclared"]).to eq("GPL-2.0-only")
+    end
+
+    it "preserves existing LicenseRef- prefixed IDs" do
+      gem_data = [{name: "my-gem", version: "1.0.0", licenses: ["LicenseRef-custom"]}]
+      sbom = described_class.generate(gem_data, "test-project")
+
+      package = sbom.to_hash["packages"].find { |p| p["name"] == "my-gem" }
+      expect(package["licenseDeclared"]).to eq("LicenseRef-custom")
+    end
+
     it "sets NOASSERTION for packages with no license information" do
       gem_data = [{name: "no-license", version: "1.0.0", licenses: []}]
       sbom = described_class.generate(gem_data, "test-project")
@@ -109,7 +133,7 @@ RSpec.describe Bundler::Sbom::SPDX do
             "supplier" => "NOASSERTION",
             "externalRefs" => [
               {
-                "referenceCategory" => "PACKAGE_MANAGER",
+                "referenceCategory" => "PACKAGE-MANAGER",
                 "referenceType" => "purl",
                 "referenceLocator" => "pkg:gem/rake@13.0.6"
               }
@@ -172,7 +196,7 @@ RSpec.describe Bundler::Sbom::SPDX do
             <copyrightText>NOASSERTION</copyrightText>
             <supplier>NOASSERTION</supplier>
             <externalRef>
-              <referenceCategory>PACKAGE_MANAGER</referenceCategory>
+              <referenceCategory>PACKAGE-MANAGER</referenceCategory>
               <referenceType>purl</referenceType>
               <referenceLocator>pkg:gem/rake@13.0.6</referenceLocator>
             </externalRef>
@@ -208,7 +232,7 @@ RSpec.describe Bundler::Sbom::SPDX do
       expect(package["externalRefs"].size).to eq(1)
 
       ext_ref = package["externalRefs"].first
-      expect(ext_ref["referenceCategory"]).to eq("PACKAGE_MANAGER")
+      expect(ext_ref["referenceCategory"]).to eq("PACKAGE-MANAGER")
       expect(ext_ref["referenceType"]).to eq("purl")
       expect(ext_ref["referenceLocator"]).to eq("pkg:gem/rake@13.0.6")
     end
