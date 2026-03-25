@@ -18,7 +18,7 @@ module Bundler
         begin
           gemspec ||= Gem::Specification.find_by_name(spec.name, spec.version)
         rescue Gem::LoadError
-          # ignore
+          Bundler.ui.warn("Warning: Could not find license information for #{spec.name} (#{spec.version})")
         end
 
         licenses = []
