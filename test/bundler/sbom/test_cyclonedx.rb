@@ -44,7 +44,7 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
     sbom = Bundler::Sbom::CycloneDX.generate([], "test-project")
     assert_kind_of Bundler::Sbom::CycloneDX, sbom
     assert_equal "CycloneDX", sbom.to_hash["bomFormat"]
-    assert_equal "1.4", sbom.to_hash["specVersion"]
+    assert_equal "1.6", sbom.to_hash["specVersion"]
     assert_match(/^urn:uuid:[0-9a-f-]+$/, sbom.to_hash["serialNumber"])
     assert_kind_of Array, sbom.to_hash["components"]
   end
@@ -59,6 +59,7 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
     assert_equal "13.0.6", component["version"]
     assert_equal "library", component["type"]
     assert_equal "pkg:gem/rake@13.0.6", component["purl"]
+    assert_equal "pkg:gem/rake@13.0.6", component["bom-ref"]
     assert_kind_of Array, component["licenses"]
     assert_equal "MIT", component["licenses"].first["license"]["id"]
   end
@@ -105,8 +106,60 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
 
     assert_kind_of Hash, sbom.to_hash["metadata"]
     assert_match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/, sbom.to_hash["metadata"]["timestamp"])
-    assert_kind_of Array, sbom.to_hash["metadata"]["tools"]
-    assert_equal "bundle-sbom", sbom.to_hash["metadata"]["tools"].first["name"]
+    assert_kind_of Hash, sbom.to_hash["metadata"]["tools"]
+    tool_components = sbom.to_hash["metadata"]["tools"]["components"]
+    assert_kind_of Array, tool_components
+    assert_equal "bundle-sbom", tool_components.first["name"]
+    assert_equal "application", tool_components.first["type"]
+  end
+
+  # -- dependencies graph --
+
+  def test_generate_includes_dependencies_graph
+    gem_data = [
+      {name: "actionpack", version: "7.0.0", licenses: ["MIT"], dependencies: ["rack", "activesupport"]},
+      {name: "rack", version: "3.0.0", licenses: ["MIT"], dependencies: []},
+      {name: "activesupport", version: "7.0.0", licenses: ["MIT"], dependencies: ["tzinfo"]},
+      {name: "tzinfo", version: "2.0.6", licenses: ["MIT"], dependencies: []}
+    ]
+    sbom = Bundler::Sbom::CycloneDX.generate(gem_data, "test-project", direct_dependencies: ["actionpack"])
+    deps = sbom.to_hash["dependencies"]
+
+    assert_kind_of Array, deps
+
+    root_ref = sbom.to_hash["metadata"]["component"]["bom-ref"]
+    refute_nil root_ref
+    root_entry = deps.find { |d| d["ref"] == root_ref }
+    refute_nil root_entry
+    assert_equal ["pkg:gem/actionpack@7.0.0"], root_entry["dependsOn"]
+
+    actionpack_entry = deps.find { |d| d["ref"] == "pkg:gem/actionpack@7.0.0" }
+    refute_nil actionpack_entry
+    assert_equal ["pkg:gem/rack@3.0.0", "pkg:gem/activesupport@7.0.0"].sort, actionpack_entry["dependsOn"].sort
+
+    activesupport_entry = deps.find { |d| d["ref"] == "pkg:gem/activesupport@7.0.0" }
+    assert_equal ["pkg:gem/tzinfo@2.0.6"], activesupport_entry["dependsOn"]
+
+    rack_entry = deps.find { |d| d["ref"] == "pkg:gem/rack@3.0.0" }
+    assert_equal [], rack_entry["dependsOn"]
+  end
+
+  def test_generate_dependencies_ignores_unknown_names
+    gem_data = [
+      {name: "foo", version: "1.0.0", licenses: [], dependencies: ["bar", "missing"]},
+      {name: "bar", version: "2.0.0", licenses: [], dependencies: []}
+    ]
+    sbom = Bundler::Sbom::CycloneDX.generate(gem_data, "test-project")
+    foo_entry = sbom.to_hash["dependencies"].find { |d| d["ref"] == "pkg:gem/foo@1.0.0" }
+    assert_equal ["pkg:gem/bar@2.0.0"], foo_entry["dependsOn"]
+  end
+
+  def test_generate_without_dependency_data_emits_empty_depends_on
+    gem_data = [{name: "rake", version: "13.0.6", licenses: ["MIT"]}]
+    sbom = Bundler::Sbom::CycloneDX.generate(gem_data, "test-project")
+    rake_entry = sbom.to_hash["dependencies"].find { |d| d["ref"] == "pkg:gem/rake@13.0.6" }
+    refute_nil rake_entry
+    assert_equal [], rake_entry["dependsOn"]
   end
 
   # -- #to_xml --
@@ -114,21 +167,24 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
   def test_to_xml
     cyclonedx_hash = {
       "bomFormat" => "CycloneDX",
-      "specVersion" => "1.4",
+      "specVersion" => "1.6",
       "serialNumber" => "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
       "version" => 1,
       "metadata" => {
         "timestamp" => "2023-01-01T12:00:00Z",
-        "tools" => [
-          {"vendor" => "Bundler", "name" => "bundle-sbom", "version" => "0.1.0"}
-        ],
+        "tools" => {
+          "components" => [
+            {"type" => "application", "name" => "bundle-sbom", "version" => "0.1.0"}
+          ]
+        },
         "component" => {
           "type" => "application", "name" => "test-project", "version" => "0.0.0"
         }
       },
       "components" => [
         {
-          "type" => "library", "name" => "rake", "version" => "13.0.6",
+          "type" => "library", "bom-ref" => "pkg:gem/rake@13.0.6",
+          "name" => "rake", "version" => "13.0.6",
           "purl" => "pkg:gem/rake@13.0.6",
           "licenses" => [{"license" => {"id" => "MIT"}}]
         },
@@ -157,17 +213,16 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
     root = doc.root
 
     assert_equal "bom", root.name
-    assert_includes root.namespace, "cyclonedx.org/schema"
+    assert_equal "http://cyclonedx.org/schema/bom/1.6", root.namespace
     assert_equal "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79", root.attributes["serialNumber"]
 
     metadata = REXML::XPath.first(root, "metadata")
     refute_nil metadata
     assert_equal "2023-01-01T12:00:00Z", REXML::XPath.first(metadata, "timestamp").text
 
-    tools = REXML::XPath.first(metadata, "tools")
-    refute_nil tools
-    tool = REXML::XPath.first(tools, "tool")
+    tool = REXML::XPath.first(metadata, "tools/components/component")
     refute_nil tool
+    assert_equal "application", tool.attributes["type"]
     assert_equal "bundle-sbom", REXML::XPath.first(tool, "name").text
 
     components = REXML::XPath.first(root, "components")
@@ -177,6 +232,7 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
 
     comp1 = comps[0]
     assert_equal "library", comp1.attributes["type"]
+    assert_equal "pkg:gem/rake@13.0.6", comp1.attributes["bom-ref"]
     assert_equal "rake", REXML::XPath.first(comp1, "name").text
     assert_equal "13.0.6", REXML::XPath.first(comp1, "version").text
     assert_equal "pkg:gem/rake@13.0.6", REXML::XPath.first(comp1, "purl").text
@@ -207,20 +263,49 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
     assert_nil REXML::XPath.first(license3, "id")
   end
 
+  def test_to_xml_emits_dependencies
+    gem_data = [
+      {name: "foo", version: "1.0.0", licenses: [], dependencies: ["bar"]},
+      {name: "bar", version: "2.0.0", licenses: [], dependencies: []}
+    ]
+    sbom = Bundler::Sbom::CycloneDX.generate(gem_data, "test-project", direct_dependencies: ["foo"])
+    doc = REXML::Document.new(sbom.to_xml)
+    root = doc.root
+
+    deps_el = REXML::XPath.first(root, "dependencies")
+    refute_nil deps_el
+
+    entries = REXML::XPath.each(deps_el, "dependency").to_a
+    refs = entries.map { |e| e.attributes["ref"] }
+    assert_includes refs, "pkg:gem/foo@1.0.0"
+    assert_includes refs, "pkg:gem/bar@2.0.0"
+
+    foo_el = entries.find { |e| e.attributes["ref"] == "pkg:gem/foo@1.0.0" }
+    foo_children = REXML::XPath.each(foo_el, "dependency").map { |c| c.attributes["ref"] }
+    assert_equal ["pkg:gem/bar@2.0.0"], foo_children
+
+    root_ref = sbom.to_hash["metadata"]["component"]["bom-ref"]
+    root_el = entries.find { |e| e.attributes["ref"] == root_ref }
+    refute_nil root_el
+    root_children = REXML::XPath.each(root_el, "dependency").map { |c| c.attributes["ref"] }
+    assert_equal ["pkg:gem/foo@1.0.0"], root_children
+  end
+
   # -- .parse_xml --
 
   def test_parse_xml
     cyclonedx_xml_content = <<~XML
       <?xml version="1.0" encoding="UTF-8"?>
-      <bom xmlns="http://cyclonedx.org/schema/bom/1.4" serialNumber="urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79" version="1">
+      <bom xmlns="http://cyclonedx.org/schema/bom/1.6" serialNumber="urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79" version="1">
         <metadata>
           <timestamp>2023-01-01T12:00:00Z</timestamp>
           <tools>
-            <tool>
-              <vendor>Bundler</vendor>
-              <name>bundle-sbom</name>
-              <version>0.1.0</version>
-            </tool>
+            <components>
+              <component type="application">
+                <name>bundle-sbom</name>
+                <version>0.1.0</version>
+              </component>
+            </components>
           </tools>
           <component type="application">
             <name>test-project</name>
@@ -228,7 +313,7 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
           </component>
         </metadata>
         <components>
-          <component type="library">
+          <component type="library" bom-ref="pkg:gem/rake@13.0.6">
             <name>rake</name>
             <version>13.0.6</version>
             <purl>pkg:gem/rake@13.0.6</purl>
@@ -270,12 +355,15 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
 
     assert_kind_of Bundler::Sbom::CycloneDX, sbom
     assert_equal "CycloneDX", sbom.to_hash["bomFormat"]
+    assert_equal "1.6", sbom.to_hash["specVersion"]
+    assert_equal "bundle-sbom", sbom.to_hash["metadata"]["tools"]["components"].first["name"]
     assert_kind_of Array, sbom.to_hash["components"]
     assert_equal 3, sbom.to_hash["components"].size
 
     rake_comp = sbom.to_hash["components"].find { |c| c["name"] == "rake" }
     refute_nil rake_comp
     assert_equal "13.0.6", rake_comp["version"]
+    assert_equal "pkg:gem/rake@13.0.6", rake_comp["bom-ref"]
     assert_equal [{"license" => {"id" => "MIT"}}], rake_comp["licenses"]
 
     bundler_comp = sbom.to_hash["components"].find { |c| c["name"] == "bundler" }
@@ -286,5 +374,77 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
     custom_comp = sbom.to_hash["components"].find { |c| c["name"] == "custom-gem" }
     refute_nil custom_comp
     assert_equal [{"license" => {"name" => "Custom License"}}], custom_comp["licenses"]
+  end
+
+  def test_parse_xml_reads_dependencies
+    xml = <<~XML
+      <?xml version="1.0" encoding="UTF-8"?>
+      <bom xmlns="http://cyclonedx.org/schema/bom/1.6" serialNumber="urn:uuid:abc" version="1">
+        <metadata>
+          <timestamp>2023-01-01T12:00:00Z</timestamp>
+          <tools><components/></tools>
+          <component type="application" bom-ref="root">
+            <name>test-project</name>
+            <version>0.0.0</version>
+          </component>
+        </metadata>
+        <components>
+          <component type="library" bom-ref="pkg:gem/foo@1.0.0">
+            <name>foo</name><version>1.0.0</version><purl>pkg:gem/foo@1.0.0</purl>
+          </component>
+          <component type="library" bom-ref="pkg:gem/bar@2.0.0">
+            <name>bar</name><version>2.0.0</version><purl>pkg:gem/bar@2.0.0</purl>
+          </component>
+        </components>
+        <dependencies>
+          <dependency ref="root">
+            <dependency ref="pkg:gem/foo@1.0.0"/>
+          </dependency>
+          <dependency ref="pkg:gem/foo@1.0.0">
+            <dependency ref="pkg:gem/bar@2.0.0"/>
+          </dependency>
+          <dependency ref="pkg:gem/bar@2.0.0"/>
+        </dependencies>
+      </bom>
+    XML
+
+    sbom = Bundler::Sbom::CycloneDX.parse_xml(REXML::Document.new(xml))
+    deps = sbom.to_hash["dependencies"]
+    assert_equal 3, deps.size
+
+    foo = deps.find { |d| d["ref"] == "pkg:gem/foo@1.0.0" }
+    assert_equal ["pkg:gem/bar@2.0.0"], foo["dependsOn"]
+
+    bar = deps.find { |d| d["ref"] == "pkg:gem/bar@2.0.0" }
+    assert_equal [], bar["dependsOn"]
+
+    assert_equal "root", sbom.to_hash["metadata"]["component"]["bom-ref"]
+  end
+
+  def test_parse_xml_reads_legacy_1_4_tools
+    xml = <<~XML
+      <?xml version="1.0" encoding="UTF-8"?>
+      <bom xmlns="http://cyclonedx.org/schema/bom/1.4" serialNumber="urn:uuid:abc" version="1">
+        <metadata>
+          <timestamp>2023-01-01T12:00:00Z</timestamp>
+          <tools>
+            <tool>
+              <vendor>Bundler</vendor>
+              <name>bundle-sbom</name>
+              <version>0.1.0</version>
+            </tool>
+          </tools>
+          <component type="application">
+            <name>test-project</name>
+            <version>0.0.0</version>
+          </component>
+        </metadata>
+        <components/>
+      </bom>
+    XML
+
+    sbom = Bundler::Sbom::CycloneDX.parse_xml(REXML::Document.new(xml))
+    assert_equal "1.4", sbom.to_hash["specVersion"]
+    assert_equal "bundle-sbom", sbom.to_hash["metadata"]["tools"]["components"].first["name"]
   end
 end

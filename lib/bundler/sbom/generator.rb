@@ -26,10 +26,11 @@ module Bundler
 
         gems = get_gems_for_groups(lockfile)
         gem_data = resolve_gem_data(gems)
+        direct_dependencies = lockfile.dependencies.keys
 
         case @format
         when "cyclonedx"
-          CycloneDX.generate(gem_data, document_name)
+          CycloneDX.generate(gem_data, document_name, direct_dependencies: direct_dependencies)
         else
           SPDX.generate(gem_data, document_name)
         end
@@ -93,8 +94,18 @@ module Bundler
           gem_key = "#{spec.name}:#{spec.version}"
           next if seen.include?(gem_key)
           seen.add(gem_key)
-          {name: spec.name, version: spec.version.to_s, licenses: SpecLicenseFinder.find_licenses(spec)}
+          {
+            name: spec.name,
+            version: spec.version.to_s,
+            licenses: SpecLicenseFinder.find_licenses(spec),
+            dependencies: spec_dependency_names(spec)
+          }
         end
+      end
+
+      def spec_dependency_names(spec)
+        return [] unless spec.respond_to?(:dependencies) && spec.dependencies
+        spec.dependencies.reject { |d| d.respond_to?(:type) && d.type == :development }.map(&:name)
       end
     end
   end
