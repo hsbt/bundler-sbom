@@ -7,7 +7,7 @@ module Bundler
     class CycloneDX
       include SbomDocument
 
-      SPEC_VERSION = "1.6"
+      SPEC_VERSION = "1.7"
       XML_NAMESPACE = "http://cyclonedx.org/schema/bom/#{SPEC_VERSION}"
 
       def self.generate(gem_data, document_name, direct_dependencies: [])

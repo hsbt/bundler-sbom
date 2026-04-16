@@ -356,7 +356,7 @@ class Bundler::Sbom::GeneratorTest < Minitest::Test
       sbom = Bundler::Sbom::Generator.new(format: "cyclonedx").generate
       assert_kind_of Bundler::Sbom::CycloneDX, sbom
       assert_equal "CycloneDX", sbom.to_hash["bomFormat"]
-      assert_equal "1.6", sbom.to_hash["specVersion"]
+      assert_equal "1.7", sbom.to_hash["specVersion"]
       assert_match(/^urn:uuid:[0-9a-f-]+$/, sbom.to_hash["serialNumber"])
       assert_kind_of Array, sbom.to_hash["components"]
     end
@@ -576,7 +576,7 @@ class Bundler::Sbom::GeneratorTest < Minitest::Test
   def test_cyclonedx_to_xml
     cyclonedx_hash = {
       "bomFormat" => "CycloneDX",
-      "specVersion" => "1.6",
+      "specVersion" => "1.7",
       "serialNumber" => "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
       "version" => 1,
       "metadata" => {

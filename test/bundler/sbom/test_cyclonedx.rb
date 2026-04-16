@@ -44,7 +44,7 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
     sbom = Bundler::Sbom::CycloneDX.generate([], "test-project")
     assert_kind_of Bundler::Sbom::CycloneDX, sbom
     assert_equal "CycloneDX", sbom.to_hash["bomFormat"]
-    assert_equal "1.6", sbom.to_hash["specVersion"]
+    assert_equal "1.7", sbom.to_hash["specVersion"]
     assert_match(/^urn:uuid:[0-9a-f-]+$/, sbom.to_hash["serialNumber"])
     assert_kind_of Array, sbom.to_hash["components"]
   end
@@ -167,7 +167,7 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
   def test_to_xml
     cyclonedx_hash = {
       "bomFormat" => "CycloneDX",
-      "specVersion" => "1.6",
+      "specVersion" => "1.7",
       "serialNumber" => "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
       "version" => 1,
       "metadata" => {
@@ -213,7 +213,7 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
     root = doc.root
 
     assert_equal "bom", root.name
-    assert_equal "http://cyclonedx.org/schema/bom/1.6", root.namespace
+    assert_equal "http://cyclonedx.org/schema/bom/1.7", root.namespace
     assert_equal "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79", root.attributes["serialNumber"]
 
     metadata = REXML::XPath.first(root, "metadata")
@@ -296,7 +296,7 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
   def test_parse_xml
     cyclonedx_xml_content = <<~XML
       <?xml version="1.0" encoding="UTF-8"?>
-      <bom xmlns="http://cyclonedx.org/schema/bom/1.6" serialNumber="urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79" version="1">
+      <bom xmlns="http://cyclonedx.org/schema/bom/1.7" serialNumber="urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79" version="1">
         <metadata>
           <timestamp>2023-01-01T12:00:00Z</timestamp>
           <tools>
@@ -355,7 +355,7 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
 
     assert_kind_of Bundler::Sbom::CycloneDX, sbom
     assert_equal "CycloneDX", sbom.to_hash["bomFormat"]
-    assert_equal "1.6", sbom.to_hash["specVersion"]
+    assert_equal "1.7", sbom.to_hash["specVersion"]
     assert_equal "bundle-sbom", sbom.to_hash["metadata"]["tools"]["components"].first["name"]
     assert_kind_of Array, sbom.to_hash["components"]
     assert_equal 3, sbom.to_hash["components"].size
@@ -379,7 +379,7 @@ class Bundler::Sbom::CycloneDXTest < Minitest::Test
   def test_parse_xml_reads_dependencies
     xml = <<~XML
       <?xml version="1.0" encoding="UTF-8"?>
-      <bom xmlns="http://cyclonedx.org/schema/bom/1.6" serialNumber="urn:uuid:abc" version="1">
+      <bom xmlns="http://cyclonedx.org/schema/bom/1.7" serialNumber="urn:uuid:abc" version="1">
         <metadata>
           <timestamp>2023-01-01T12:00:00Z</timestamp>
           <tools><components/></tools>

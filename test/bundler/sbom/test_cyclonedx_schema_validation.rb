@@ -18,12 +18,13 @@ class CycloneDXSchemaValidationTest < Minitest::Test
 
   def schema
     fixtures_dir = File.join(TestHelper.root, "test", "fixtures")
-    schema_path = File.join(fixtures_dir, "bom-1.6.schema.json")
+    schema_path = File.join(fixtures_dir, "bom-1.7.schema.json")
     ref_resolver = proc do |uri|
       filename = uri.path.split("/").last
       local_files = {
         "spdx.schema.json" => "spdx.SPDX.schema.json",
-        "jsf-0.82.schema.json" => "jsf-0.82.schema.json"
+        "jsf-0.82.schema.json" => "jsf-0.82.schema.json",
+        "cryptography-defs.schema.json" => "cryptography-defs.schema.json"
       }
       local_name = local_files[filename] || filename
       file = File.join(fixtures_dir, local_name)
