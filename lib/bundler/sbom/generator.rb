@@ -42,7 +42,7 @@ module Bundler
         if root.name == "bom" && root.namespace.include?("cyclonedx.org")
           CycloneDX.parse_xml(doc)
         else
-          SPDX.parse_xml(doc)
+          raise ArgumentError, "Unsupported XML SBOM: only CycloneDX XML can be read"
         end
       end
 
@@ -93,8 +93,18 @@ module Bundler
           gem_key = "#{spec.name}:#{spec.version}"
           next if seen.include?(gem_key)
           seen.add(gem_key)
-          {name: spec.name, version: spec.version.to_s, licenses: SpecLicenseFinder.find_licenses(spec)}
+          {
+            name: spec.name,
+            version: spec.version.to_s,
+            licenses: SpecLicenseFinder.find_licenses(spec),
+            dependencies: spec_dependency_names(spec)
+          }
         end
+      end
+
+      def spec_dependency_names(spec)
+        return [] unless spec.respond_to?(:dependencies) && spec.dependencies
+        spec.dependencies.reject { |d| d.respond_to?(:type) && d.type == :development }.map(&:name)
       end
     end
   end

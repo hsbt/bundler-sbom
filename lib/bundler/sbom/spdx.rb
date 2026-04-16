@@ -15,8 +15,7 @@ module Bundler
           "spdxVersion" => "SPDX-2.3",
           "creationInfo" => {
             "created" => Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "creators" => ["Tool: bundle-sbom"],
-            "licenseListVersion" => "3.20"
+            "creators" => ["Tool: bundle-sbom"]
           },
           "name" => document_name,
           "dataLicense" => "CC0-1.0",
@@ -24,12 +23,21 @@ module Bundler
           "packages" => []
         }
 
+        if (list_version = license_list_version)
+          sbom["creationInfo"]["licenseListVersion"] = list_version
+        end
+
+        package_ids = {}
+        gem_data.each do |gem|
+          package_ids[gem[:name]] = "SPDXRef-Package-#{gem[:name]}"
+        end
+
         gem_data.each do |gem|
           spdx_licenses = gem[:licenses].map { |l| normalize_license_id(l) }
           license_string = spdx_licenses.empty? ? "NOASSERTION" : spdx_licenses.join(" AND ")
 
           package = {
-            "SPDXID" => "SPDXRef-Package-#{gem[:name]}",
+            "SPDXID" => package_ids[gem[:name]],
             "name" => gem[:name],
             "versionInfo" => gem[:version],
             "downloadLocation" => "https://rubygems.org/gems/#{gem[:name]}/versions/#{gem[:version]}",
@@ -50,6 +58,7 @@ module Bundler
         end
 
         sbom["documentDescribes"] = sbom["packages"].map { |p| p["SPDXID"] }
+
         sbom["relationships"] = sbom["packages"].map do |p|
           {
             "spdxElementId" => "SPDXRef-DOCUMENT",
@@ -57,138 +66,20 @@ module Bundler
             "relationshipType" => "DESCRIBES"
           }
         end
-        new(sbom)
-      end
 
-      def self.parse_xml(doc)
-        root = doc.root
-
-        sbom = {
-          "SPDXID" => get_element_text(root, "SPDXID"),
-          "spdxVersion" => get_element_text(root, "spdxVersion"),
-          "name" => get_element_text(root, "name"),
-          "dataLicense" => get_element_text(root, "dataLicense"),
-          "documentNamespace" => get_element_text(root, "documentNamespace"),
-          "creationInfo" => {
-            "created" => get_element_text(root, "creationInfo/created"),
-            "licenseListVersion" => get_element_text(root, "creationInfo/licenseListVersion"),
-            "creators" => []
-          },
-          "packages" => [],
-          "documentDescribes" => [],
-          "relationships" => []
-        }
-
-        REXML::XPath.each(root, "creationInfo/creator") do |creator|
-          sbom["creationInfo"]["creators"] << creator.text
-        end
-
-        REXML::XPath.each(root, "documentDescribes") do |describes|
-          sbom["documentDescribes"] << describes.text
-        end
-
-        REXML::XPath.each(root, "package") do |pkg_element|
-          package = {
-            "SPDXID" => get_element_text(pkg_element, "SPDXID"),
-            "name" => get_element_text(pkg_element, "name"),
-            "versionInfo" => get_element_text(pkg_element, "versionInfo"),
-            "downloadLocation" => get_element_text(pkg_element, "downloadLocation"),
-            "filesAnalyzed" => get_element_text(pkg_element, "filesAnalyzed") == "true",
-            "licenseConcluded" => get_element_text(pkg_element, "licenseConcluded"),
-            "licenseDeclared" => get_element_text(pkg_element, "licenseDeclared"),
-            "copyrightText" => get_element_text(pkg_element, "copyrightText"),
-            "supplier" => get_element_text(pkg_element, "supplier"),
-            "externalRefs" => []
-          }
-
-          REXML::XPath.each(pkg_element, "externalRef") do |ref_element|
-            ref = {
-              "referenceCategory" => get_element_text(ref_element, "referenceCategory"),
-              "referenceType" => get_element_text(ref_element, "referenceType"),
-              "referenceLocator" => get_element_text(ref_element, "referenceLocator")
+        gem_data.each do |gem|
+          (gem[:dependencies] || []).each do |dep_name|
+            dep_id = package_ids[dep_name]
+            next unless dep_id
+            sbom["relationships"] << {
+              "spdxElementId" => package_ids[gem[:name]],
+              "relatedSpdxElement" => dep_id,
+              "relationshipType" => "DEPENDS_ON"
             }
-            package["externalRefs"] << ref
           end
-
-          sbom["packages"] << package
-        end
-
-        REXML::XPath.each(root, "relationship") do |rel_element|
-          sbom["relationships"] << {
-            "spdxElementId" => get_element_text(rel_element, "spdxElementId"),
-            "relatedSpdxElement" => get_element_text(rel_element, "relatedSpdxElement"),
-            "relationshipType" => get_element_text(rel_element, "relationshipType")
-          }
         end
 
         new(sbom)
-      end
-
-      def to_xml
-        doc = REXML::Document.new
-        doc << REXML::XMLDecl.new("1.0", "UTF-8")
-
-        root = REXML::Element.new("SpdxDocument")
-        root.add_namespace("https://spdx.org/spdxdocs/")
-        doc.add_element(root)
-
-        add_element(root, "SPDXID", @data["SPDXID"])
-        add_element(root, "spdxVersion", @data["spdxVersion"])
-        add_element(root, "name", @data["name"])
-        add_element(root, "dataLicense", @data["dataLicense"])
-        add_element(root, "documentNamespace", @data["documentNamespace"])
-
-        creation_info = REXML::Element.new("creationInfo")
-        root.add_element(creation_info)
-        add_element(creation_info, "created", @data["creationInfo"]["created"])
-        add_element(creation_info, "licenseListVersion", @data["creationInfo"]["licenseListVersion"])
-
-        @data["creationInfo"]["creators"].each do |creator|
-          add_element(creation_info, "creator", creator)
-        end
-
-        @data["documentDescribes"].each do |describes|
-          add_element(root, "documentDescribes", describes)
-        end
-
-        @data["packages"].each do |pkg|
-          package = REXML::Element.new("package")
-          root.add_element(package)
-
-          add_element(package, "SPDXID", pkg["SPDXID"])
-          add_element(package, "name", pkg["name"])
-          add_element(package, "versionInfo", pkg["versionInfo"])
-          add_element(package, "downloadLocation", pkg["downloadLocation"])
-          add_element(package, "filesAnalyzed", pkg["filesAnalyzed"].to_s)
-          add_element(package, "licenseConcluded", pkg["licenseConcluded"])
-          add_element(package, "licenseDeclared", pkg["licenseDeclared"])
-          add_element(package, "copyrightText", pkg["copyrightText"])
-          add_element(package, "supplier", pkg["supplier"])
-
-          if pkg["externalRefs"]
-            pkg["externalRefs"].each do |ref|
-              ext_ref = REXML::Element.new("externalRef")
-              package.add_element(ext_ref)
-
-              add_element(ext_ref, "referenceCategory", ref["referenceCategory"])
-              add_element(ext_ref, "referenceType", ref["referenceType"])
-              add_element(ext_ref, "referenceLocator", ref["referenceLocator"])
-            end
-          end
-        end
-
-        if @data["relationships"]
-          @data["relationships"].each do |rel|
-            relationship = REXML::Element.new("relationship")
-            root.add_element(relationship)
-
-            add_element(relationship, "spdxElementId", rel["spdxElementId"])
-            add_element(relationship, "relatedSpdxElement", rel["relatedSpdxElement"])
-            add_element(relationship, "relationshipType", rel["relationshipType"])
-          end
-        end
-
-        format_xml(doc)
       end
 
       DEPRECATED_LICENSE_MAP = {
@@ -198,8 +89,6 @@ module Bundler
         "LGPL-2.1" => "LGPL-2.1-only",
         "LGPL-3.0" => "LGPL-3.0-only",
       }.freeze
-
-      private
 
       def self.normalize_license_id(license_id)
         if mapped = DEPRECATED_LICENSE_MAP[license_id]
@@ -216,7 +105,15 @@ module Bundler
       end
       private_class_method :normalize_license_id
 
-      public
+      def self.license_list_version
+        return @license_list_version if defined?(@license_list_version)
+        gem_spec = Gem.loaded_specs["spdx-licenses"]
+        path = File.join(gem_spec.full_gem_path, "licenses.json")
+        @license_list_version = JSON.parse(File.read(path))["licenseListVersion"]
+      rescue StandardError
+        @license_list_version = nil
+      end
+      private_class_method :license_list_version
 
       def to_report_format
         {
