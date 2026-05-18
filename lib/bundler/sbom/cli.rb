@@ -22,6 +22,10 @@ module Bundler
           raise Thor::Error, "Error: Unsupported SBOM format '#{sbom_format}'. Supported formats: spdx, cyclonedx"
         end
 
+        if sbom_format == "spdx" && format == "xml"
+          raise Thor::Error, "Error: SPDX 2.3 does not define an XML serialization. Use '--format json' or '--sbom cyclonedx --format xml'."
+        end
+
         generator = Bundler::Sbom::Generator.new(format: sbom_format, without_groups: without_groups)
         sbom = generator.generate
 
@@ -50,8 +54,8 @@ module Bundler
         end
 
         if input_file.nil?
-          input_file = if format == "xml" || (format.nil? && File.exist?("bom.xml"))
-            "bom.xml"
+          input_file = if File.exist?("bom.json")
+            "bom.json"
           elsif File.exist?("bom-cyclonedx.json")
             "bom-cyclonedx.json"
           elsif File.exist?("bom-cyclonedx.xml")

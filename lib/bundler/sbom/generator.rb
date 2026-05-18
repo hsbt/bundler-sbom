@@ -43,7 +43,7 @@ module Bundler
         if root.name == "bom" && root.namespace.include?("cyclonedx.org")
           CycloneDX.parse_xml(doc)
         else
-          SPDX.parse_xml(doc)
+          raise ArgumentError, "Unsupported XML SBOM: only CycloneDX XML can be read"
         end
       end
 

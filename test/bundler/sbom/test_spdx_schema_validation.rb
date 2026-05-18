@@ -59,4 +59,14 @@ class SPDXSchemaValidationTest < Minitest::Test
     errors = schema.validate(sbom.to_hash).to_a
     assert_empty errors, errors.map { |e| "#{e["data_pointer"]}: #{e["type"]}" }.join("\n")
   end
+
+  def test_valid_spdx_document_with_dependencies
+    gem_data = [
+      {name: "actionpack", version: "7.0.0", licenses: ["MIT"], dependencies: ["rack"]},
+      {name: "rack", version: "3.0.0", licenses: ["MIT"], dependencies: []}
+    ]
+    sbom = Bundler::Sbom::SPDX.generate(gem_data, "test-project")
+    errors = schema.validate(sbom.to_hash).to_a
+    assert_empty errors, errors.map { |e| "#{e["data_pointer"]}: #{e["type"]}" }.join("\n")
+  end
 end

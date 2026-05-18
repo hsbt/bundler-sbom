@@ -62,28 +62,14 @@ class Bundler::Sbom::CLITest < Minitest::Test
     assert_match(/Generated SPDX SBOM at bom\.json/, out)
   end
 
-  def test_dump_xml_format_generates_spdx_xml
-    spdx_instance = Bundler::Sbom::SPDX.new(sample_spdx_sbom)
-    xml_output = "<xml>spdx</xml>"
-    spdx_instance.define_singleton_method(:to_xml) { xml_output }
-
-    received_args = nil
-    fake_new = proc do |**kwargs|
-      received_args = kwargs
-      mock_gen = Minitest::Mock.new
-      mock_gen.expect(:generate, spdx_instance)
-      mock_gen
+  def test_dump_xml_format_with_spdx_exits
+    _, err = capture_io do
+      assert_raises(SystemExit) do
+        Bundler::Sbom::CLI.start(%w[dump --format xml])
+      end
     end
-
-    out = nil
-    Bundler::Sbom::Generator.stub(:new, fake_new) do
-      out, = capture_io { Bundler::Sbom::CLI.start(%w[dump --format xml]) }
-    end
-
-    assert_equal({format: "spdx", without_groups: []}, received_args)
-    assert File.exist?("bom.xml"), "bom.xml should be created"
-    assert_equal xml_output, File.read("bom.xml")
-    assert_match(/Generated SPDX SBOM at bom\.xml/, out)
+    assert_match(/SPDX 2.3 does not define an XML serialization/, err)
+    refute File.exist?("bom.xml")
   end
 
   def test_dump_cyclonedx_json
@@ -299,40 +285,20 @@ class Bundler::Sbom::CLITest < Minitest::Test
     assert_match(/License Usage in SBOM/, out)
   end
 
-  def test_license_reads_xml_format
-    spdx_xml = <<~XML
-      <?xml version="1.0" encoding="UTF-8"?>
-      <SpdxDocument xmlns="https://spdx.org/spdxdocs/">
-        <SPDXID>SPDXRef-DOCUMENT</SPDXID>
-        <spdxVersion>SPDX-2.3</spdxVersion>
-        <name>test-project</name>
-        <dataLicense>CC0-1.0</dataLicense>
-        <documentNamespace>https://spdx.org/spdxdocs/test-project-123</documentNamespace>
-        <creationInfo>
-          <created>2023-01-01T12:00:00Z</created>
-          <creator>Tool: bundle-sbom</creator>
-          <licenseListVersion>3.20</licenseListVersion>
-        </creationInfo>
-        <package>
-          <SPDXID>SPDXRef-Package-rake</SPDXID>
-          <name>rake</name>
-          <versionInfo>13.0.6</versionInfo>
-          <licenseDeclared>MIT</licenseDeclared>
-        </package>
-      </SpdxDocument>
-    XML
-    File.write("bom.xml", spdx_xml)
-
-    out, = capture_io { Bundler::Sbom::CLI.start(%w[license --format xml]) }
-    assert_match(/License Usage in SBOM/, out)
-  end
-
   def test_license_xml_invalid_exits
-    File.write("bom.xml", "<invalid>XML Content")
+    File.write("bom-cyclonedx.xml", "<invalid>XML Content")
 
     assert_raises(SystemExit) do
-      capture_io { Bundler::Sbom::CLI.start(%w[license --format xml]) }
+      capture_io { Bundler::Sbom::CLI.start(%w[license]) }
     end
+  end
+
+  def test_license_prefers_bom_json_over_cyclonedx
+    File.write("bom.json", JSON.generate(sample_spdx_sbom))
+    File.write("bom-cyclonedx.json", JSON.generate(sample_cyclonedx_sbom))
+
+    out, = capture_io { Bundler::Sbom::CLI.start(%w[license]) }
+    assert_match(/License Usage in SBOM/, out)
   end
 
   def test_license_with_specific_file_path

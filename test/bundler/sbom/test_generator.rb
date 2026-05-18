@@ -349,6 +349,19 @@ class Bundler::Sbom::GeneratorTest < Minitest::Test
     end
   end
 
+  def test_generate_spdx_captures_dependency_graph_from_lockfile
+    specs = [
+      make_spec("actionpack", "7.0.0", dependencies: ["rack"]),
+      make_spec("rack", "3.0.0")
+    ]
+
+    stub_lockfile_and_gems(specs, default: nil) do
+      sbom = Bundler::Sbom::Generator.new.generate
+      depends_on = sbom.to_hash["relationships"].select { |r| r["relationshipType"] == "DEPENDS_ON" }
+      assert_equal [{"spdxElementId" => "SPDXRef-Package-actionpack", "relatedSpdxElement" => "SPDXRef-Package-rack", "relationshipType" => "DEPENDS_ON"}], depends_on
+    end
+  end
+
   # -- CycloneDX format tests --
 
   def test_generate_cyclonedx_document
@@ -510,67 +523,6 @@ class Bundler::Sbom::GeneratorTest < Minitest::Test
     end
   end
 
-  # -- to_xml SPDX --
-
-  def test_spdx_to_xml
-    sbom_hash = {
-      "SPDXID" => "SPDXRef-DOCUMENT",
-      "spdxVersion" => "SPDX-2.3",
-      "name" => "test-project",
-      "dataLicense" => "CC0-1.0",
-      "documentNamespace" => "https://spdx.org/spdxdocs/test-project-123",
-      "creationInfo" => {
-        "created" => "2023-01-01T12:00:00Z",
-        "creators" => ["Tool: bundle-sbom"],
-        "licenseListVersion" => "3.20"
-      },
-      "documentDescribes" => ["SPDXRef-Package-rake"],
-      "packages" => [
-        {
-          "SPDXID" => "SPDXRef-Package-rake",
-          "name" => "rake",
-          "versionInfo" => "13.0.6",
-          "downloadLocation" => "NOASSERTION",
-          "filesAnalyzed" => false,
-          "licenseConcluded" => "MIT",
-          "licenseDeclared" => "MIT",
-          "copyrightText" => "NOASSERTION",
-          "supplier" => "NOASSERTION",
-          "externalRefs" => [
-            {
-              "referenceCategory" => "PACKAGE-MANAGER",
-              "referenceType" => "purl",
-              "referenceLocator" => "pkg:gem/rake@13.0.6"
-            }
-          ]
-        }
-      ]
-    }
-
-    sbom = Bundler::Sbom::SPDX.new(sbom_hash)
-    xml_content = sbom.to_xml
-    assert_kind_of String, xml_content
-    assert_includes xml_content, '<?xml version="1.0" encoding="UTF-8"?>'
-
-    doc = REXML::Document.new(xml_content)
-    root = doc.root
-
-    assert_equal "SpdxDocument", root.name
-    assert_equal "SPDXRef-DOCUMENT", REXML::XPath.first(root, "SPDXID").text
-    assert_equal "SPDX-2.3", REXML::XPath.first(root, "spdxVersion").text
-    assert_equal "test-project", REXML::XPath.first(root, "name").text
-
-    package = REXML::XPath.first(root, "package")
-    refute_nil package
-    assert_equal "rake", REXML::XPath.first(package, "name").text
-    assert_equal "13.0.6", REXML::XPath.first(package, "versionInfo").text
-    assert_equal "MIT", REXML::XPath.first(package, "licenseDeclared").text
-
-    ext_ref = REXML::XPath.first(package, "externalRef")
-    refute_nil ext_ref
-    assert_equal "pkg:gem/rake@13.0.6", REXML::XPath.first(ext_ref, "referenceLocator").text
-  end
-
   # -- to_xml CycloneDX --
 
   def test_cyclonedx_to_xml
@@ -658,70 +610,18 @@ class Bundler::Sbom::GeneratorTest < Minitest::Test
     assert_includes license_ids, "Apache-2.0"
   end
 
-  # -- parse_xml SPDX --
+  # -- parse_xml rejects non-CycloneDX --
 
-  def test_parse_xml_spdx
+  def test_parse_xml_rejects_non_cyclonedx
     xml_content = <<~XML
       <?xml version="1.0" encoding="UTF-8"?>
-      <SpdxDocument xmlns="https://spdx.org/spdxdocs/">
-        <SPDXID>SPDXRef-DOCUMENT</SPDXID>
-        <spdxVersion>SPDX-2.3</spdxVersion>
-        <name>test-project</name>
-        <dataLicense>CC0-1.0</dataLicense>
-        <documentNamespace>https://spdx.org/spdxdocs/test-project-123</documentNamespace>
-        <creationInfo>
-          <created>2023-01-01T12:00:00Z</created>
-          <creator>Tool: bundle-sbom</creator>
-          <licenseListVersion>3.20</licenseListVersion>
-        </creationInfo>
-        <documentDescribes>SPDXRef-Package-rake</documentDescribes>
-        <package>
-          <SPDXID>SPDXRef-Package-rake</SPDXID>
-          <name>rake</name>
-          <versionInfo>13.0.6</versionInfo>
-          <downloadLocation>NOASSERTION</downloadLocation>
-          <filesAnalyzed>false</filesAnalyzed>
-          <licenseConcluded>MIT</licenseConcluded>
-          <licenseDeclared>MIT</licenseDeclared>
-          <copyrightText>NOASSERTION</copyrightText>
-          <supplier>NOASSERTION</supplier>
-          <externalRef>
-            <referenceCategory>PACKAGE-MANAGER</referenceCategory>
-            <referenceType>purl</referenceType>
-            <referenceLocator>pkg:gem/rake@13.0.6</referenceLocator>
-          </externalRef>
-        </package>
-      </SpdxDocument>
+      <SpdxDocument xmlns="https://spdx.org/spdxdocs/"/>
     XML
 
-    sbom = Bundler::Sbom::Generator.parse_xml(xml_content)
-
-    assert_kind_of Bundler::Sbom::SPDX, sbom
-    assert_equal "SPDXRef-DOCUMENT", sbom.to_hash["SPDXID"]
-    assert_equal "SPDX-2.3", sbom.to_hash["spdxVersion"]
-    assert_equal "test-project", sbom.to_hash["name"]
-    assert_equal "CC0-1.0", sbom.to_hash["dataLicense"]
-
-    assert_kind_of Hash, sbom.to_hash["creationInfo"]
-    assert_equal "2023-01-01T12:00:00Z", sbom.to_hash["creationInfo"]["created"]
-    assert_includes sbom.to_hash["creationInfo"]["creators"], "Tool: bundle-sbom"
-
-    assert_kind_of Array, sbom.to_hash["packages"]
-    assert_equal 1, sbom.to_hash["packages"].size
-
-    package = sbom.to_hash["packages"].first
-    assert_equal "SPDXRef-Package-rake", package["SPDXID"]
-    assert_equal "rake", package["name"]
-    assert_equal "13.0.6", package["versionInfo"]
-    assert_equal "MIT", package["licenseDeclared"]
-
-    assert_kind_of Array, package["externalRefs"]
-    assert_equal 1, package["externalRefs"].size
-
-    ext_ref = package["externalRefs"].first
-    assert_equal "PACKAGE-MANAGER", ext_ref["referenceCategory"]
-    assert_equal "purl", ext_ref["referenceType"]
-    assert_equal "pkg:gem/rake@13.0.6", ext_ref["referenceLocator"]
+    err = assert_raises(ArgumentError) do
+      Bundler::Sbom::Generator.parse_xml(xml_content)
+    end
+    assert_match(/only CycloneDX XML/, err.message)
   end
 
   # -- parse_xml CycloneDX --

@@ -26,13 +26,12 @@ Available options:
 - `--without GROUPS`: Exclude groups (comma or colon separated, e.g., 'development:test' or 'development,test')
 
 Generated files will be named according to the following pattern:
-- SPDX format: `bom.json` or `bom.xml`
+- SPDX format: `bom.json`
 - CycloneDX format: `bom-cyclonedx.json` or `bom-cyclonedx.xml`
 
 Examples:
 ```
 $ bundle sbom dump                           # Generates SPDX format in JSON (bom.json)
-$ bundle sbom dump -f xml                    # Generates SPDX format in XML (bom.xml)
 $ bundle sbom dump -s cyclonedx             # Generates CycloneDX format in JSON (bom-cyclonedx.json)
 $ bundle sbom dump -s cyclonedx -f xml      # Generates CycloneDX format in XML (bom-cyclonedx.xml)
 $ bundle sbom dump --without development    # Excludes development group
@@ -52,10 +51,9 @@ Available options:
 - `-F, --format FORMAT`: Input format (json or xml)
 
 If no options are specified, the command will automatically look for SBOM files in the following order:
-1. `bom.xml` (if format is xml)
+1. `bom.json`
 2. `bom-cyclonedx.json`
 3. `bom-cyclonedx.xml`
-4. `bom.json`
 
 This command will show:
 - A count of packages using each license
@@ -69,8 +67,10 @@ Note: The `license` command requires that you've already generated the SBOM usin
 [SPDX (Software Package Data Exchange)](https://spdx.dev/) is a standard format for communicating software bill of material information, including components, licenses, copyrights, and security references.
 
 - Spec version: [SPDX 2.3](https://spdx.github.io/spdx-spec/v2.3/)
-- Output formats: JSON, XML
+- Output formats: JSON
 - License identifiers are validated against the [SPDX License List](https://spdx.org/licenses/) via the `spdx-licenses` gem. Non-SPDX licenses are output as `LicenseRef-` identifiers, and deprecated SPDX IDs (e.g., `GPL-2.0`) are mapped to their current equivalents (e.g., `GPL-2.0-only`).
+- `DEPENDS_ON` relationships between packages are emitted from `Gemfile.lock`.
+- `creationInfo.licenseListVersion` reflects the SPDX license list version bundled with the `spdx-licenses` gem.
 
 ### CycloneDX (v1.7)
 [CycloneDX](https://cyclonedx.org/) is a lightweight SBOM specification designed for use in application security contexts and supply chain component analysis.
