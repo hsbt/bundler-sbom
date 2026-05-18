@@ -74,16 +74,18 @@ class Bundler::Sbom::GeneratorTest < Minitest::Test
     spec
   end
 
-  def make_spec(name, version)
+  def make_spec(name, version, dependencies: [])
     s = Object.new
     s.define_singleton_method(:name) { name }
     s.define_singleton_method(:version) { Gem::Version.new(version) }
+    s.define_singleton_method(:dependencies) { dependencies.map { |d| Gem::Dependency.new(d) } }
     s
   end
 
-  def make_lockfile_parser(specs)
+  def make_lockfile_parser(specs, dependencies: {})
     parser = Object.new
     parser.define_singleton_method(:specs) { specs }
+    parser.define_singleton_method(:dependencies) { dependencies }
     parser
   end
 
@@ -354,7 +356,7 @@ class Bundler::Sbom::GeneratorTest < Minitest::Test
       sbom = Bundler::Sbom::Generator.new(format: "cyclonedx").generate
       assert_kind_of Bundler::Sbom::CycloneDX, sbom
       assert_equal "CycloneDX", sbom.to_hash["bomFormat"]
-      assert_equal "1.4", sbom.to_hash["specVersion"]
+      assert_equal "1.7", sbom.to_hash["specVersion"]
       assert_match(/^urn:uuid:[0-9a-f-]+$/, sbom.to_hash["serialNumber"])
       assert_kind_of Array, sbom.to_hash["components"]
     end
@@ -409,8 +411,8 @@ class Bundler::Sbom::GeneratorTest < Minitest::Test
       sbom = Bundler::Sbom::Generator.new(format: "cyclonedx").generate
       assert_kind_of Hash, sbom.to_hash["metadata"]
       assert_match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/, sbom.to_hash["metadata"]["timestamp"])
-      assert_kind_of Array, sbom.to_hash["metadata"]["tools"]
-      assert_equal "bundle-sbom", sbom.to_hash["metadata"]["tools"].first["name"]
+      assert_kind_of Hash, sbom.to_hash["metadata"]["tools"]
+      assert_equal "bundle-sbom", sbom.to_hash["metadata"]["tools"]["components"].first["name"]
     end
   end
 
@@ -460,6 +462,35 @@ class Bundler::Sbom::GeneratorTest < Minitest::Test
             assert_equal 1, sbom.to_hash["components"].size
             assert_equal "rails", sbom.to_hash["components"].first["name"]
           end
+        end
+      end
+    end
+  end
+
+  def test_generate_cyclonedx_captures_dependency_graph_from_lockfile
+    specs = [
+      make_spec("actionpack", "7.0.0", dependencies: ["rack"]),
+      make_spec("rack", "3.0.0")
+    ]
+    direct = {"actionpack" => Gem::Dependency.new("actionpack")}
+
+    mock_lockfile = Object.new
+    mock_lockfile.define_singleton_method(:exist?) { true }
+    mock_lockfile.define_singleton_method(:read) { @lockfile_content }
+
+    Bundler.stub(:default_lockfile, mock_lockfile) do
+      Bundler::LockfileParser.stub(:new, make_lockfile_parser(specs, dependencies: direct)) do
+        Gem::Specification.stub(:find_by_name, proc { nil }) do
+          sbom = Bundler::Sbom::Generator.new(format: "cyclonedx").generate
+          deps = sbom.to_hash["dependencies"]
+
+          actionpack = deps.find { |d| d["ref"] == "pkg:gem/actionpack@7.0.0" }
+          refute_nil actionpack
+          assert_equal ["pkg:gem/rack@3.0.0"], actionpack["dependsOn"]
+
+          root_ref = sbom.to_hash["metadata"]["component"]["bom-ref"]
+          root = deps.find { |d| d["ref"] == root_ref }
+          assert_equal ["pkg:gem/actionpack@7.0.0"], root["dependsOn"]
         end
       end
     end
@@ -545,14 +576,16 @@ class Bundler::Sbom::GeneratorTest < Minitest::Test
   def test_cyclonedx_to_xml
     cyclonedx_hash = {
       "bomFormat" => "CycloneDX",
-      "specVersion" => "1.4",
+      "specVersion" => "1.7",
       "serialNumber" => "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
       "version" => 1,
       "metadata" => {
         "timestamp" => "2023-01-01T12:00:00Z",
-        "tools" => [
-          {"vendor" => "Bundler", "name" => "bundle-sbom", "version" => "0.1.0"}
-        ],
+        "tools" => {
+          "components" => [
+            {"type" => "application", "name" => "bundle-sbom", "version" => "0.1.0"}
+          ]
+        },
         "component" => {
           "type" => "application", "name" => "test-project", "version" => "0.0.0"
         }
@@ -590,10 +623,9 @@ class Bundler::Sbom::GeneratorTest < Minitest::Test
     refute_nil metadata
     assert_equal "2023-01-01T12:00:00Z", REXML::XPath.first(metadata, "timestamp").text
 
-    tools = REXML::XPath.first(metadata, "tools")
-    refute_nil tools
-    tool = REXML::XPath.first(tools, "tool")
+    tool = REXML::XPath.first(metadata, "tools/components/component")
     refute_nil tool
+    assert_equal "application", tool.attributes["type"]
     assert_equal "bundle-sbom", REXML::XPath.first(tool, "name").text
 
     components = REXML::XPath.first(root, "components")

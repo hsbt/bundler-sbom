@@ -18,11 +18,13 @@ class CycloneDXSchemaValidationTest < Minitest::Test
 
   def schema
     fixtures_dir = File.join(TestHelper.root, "test", "fixtures")
-    schema_path = File.join(fixtures_dir, "bom-1.4.schema.json")
+    schema_path = File.join(fixtures_dir, "bom-1.7.schema.json")
     ref_resolver = proc do |uri|
       filename = uri.path.split("/").last
       local_files = {
-        "spdx.schema.json" => "spdx.SPDX.schema.json"
+        "spdx.schema.json" => "spdx.SPDX.schema.json",
+        "jsf-0.82.schema.json" => "jsf-0.82.schema.json",
+        "cryptography-defs.schema.json" => "cryptography-defs.schema.json"
       }
       local_name = local_files[filename] || filename
       file = File.join(fixtures_dir, local_name)
@@ -66,6 +68,16 @@ class CycloneDXSchemaValidationTest < Minitest::Test
 
   def test_valid_cyclonedx_document_with_empty_gem_list
     sbom = generate_sbom([])
+    errors = schema.validate(sbom.to_hash).to_a
+    assert_empty errors, errors.map { |e| "#{e["data_pointer"]}: #{e["type"]} - #{e["details"]}" }.join("\n")
+  end
+
+  def test_valid_cyclonedx_document_with_dependencies
+    gem_data = [
+      {name: "actionpack", version: "7.0.0", licenses: ["MIT"], dependencies: ["rack"]},
+      {name: "rack", version: "3.0.0", licenses: ["MIT"], dependencies: []}
+    ]
+    sbom = Bundler::Sbom::CycloneDX.generate(gem_data, "test-project", direct_dependencies: ["actionpack"])
     errors = schema.validate(sbom.to_hash).to_a
     assert_empty errors, errors.map { |e| "#{e["data_pointer"]}: #{e["type"]} - #{e["details"]}" }.join("\n")
   end
