@@ -1,10 +1,11 @@
 require "json"
+require "bundler/vendored_thor"
 require "bundler/sbom/generator"
 require "bundler/sbom/reporter"
 
 module Bundler
   module Sbom
-    class CLI < Thor
+    class CLI < Bundler::Thor
       desc "dump", "Generate SBOM and save to file"
       method_option :format, type: :string, default: "json", desc: "Output format: json or xml", aliases: "-f"
       method_option :sbom, type: :string, default: "spdx", desc: "SBOM format: spdx or cyclonedx", aliases: "-s"
@@ -15,15 +16,15 @@ module Bundler
         without_groups = parse_without_groups(options[:without])
 
         unless ["json", "xml"].include?(format)
-          raise Thor::Error, "Error: Unsupported output format '#{format}'. Supported formats: json, xml"
+          raise Bundler::Thor::Error, "Error: Unsupported output format '#{format}'. Supported formats: json, xml"
         end
 
         unless ["spdx", "cyclonedx"].include?(sbom_format)
-          raise Thor::Error, "Error: Unsupported SBOM format '#{sbom_format}'. Supported formats: spdx, cyclonedx"
+          raise Bundler::Thor::Error, "Error: Unsupported SBOM format '#{sbom_format}'. Supported formats: spdx, cyclonedx"
         end
 
         if sbom_format == "spdx" && format == "xml"
-          raise Thor::Error, "Error: SPDX 2.3 does not define an XML serialization. Use '--format json' or '--sbom cyclonedx --format xml'."
+          raise Bundler::Thor::Error, "Error: SPDX 2.3 does not define an XML serialization. Use '--format json' or '--sbom cyclonedx --format xml'."
         end
 
         generator = Bundler::Sbom::Generator.new(format: sbom_format, without_groups: without_groups)
@@ -50,7 +51,7 @@ module Bundler
         input_file = options[:file]
 
         if format && !["json", "xml"].include?(format)
-          raise Thor::Error, "Error: Unsupported format '#{format}'. Supported formats: json, xml"
+          raise Bundler::Thor::Error, "Error: Unsupported format '#{format}'. Supported formats: json, xml"
         end
 
         if input_file.nil?
@@ -68,7 +69,7 @@ module Bundler
         unless File.exist?(input_file)
           file_type = (File.extname(input_file) == ".xml") ? "xml" : "json"
           sbom_type = input_file.include?("cyclonedx") ? "cyclonedx" : "spdx"
-          raise Thor::Error, "Error: #{input_file} not found. Run 'bundle sbom dump --format=#{file_type} --sbom=#{sbom_type}' first."
+          raise Bundler::Thor::Error, "Error: #{input_file} not found. Run 'bundle sbom dump --format=#{file_type} --sbom=#{sbom_type}' first."
         end
 
         content = File.read(input_file)
@@ -81,11 +82,11 @@ module Bundler
 
         Bundler::Sbom::Reporter.new(sbom).display_license_report
       rescue JSON::ParserError
-        raise Thor::Error, "Error: #{input_file} is not a valid JSON file"
-      rescue Thor::Error
+        raise Bundler::Thor::Error, "Error: #{input_file} is not a valid JSON file"
+      rescue Bundler::Thor::Error
         raise
       rescue => e
-        raise Thor::Error, "Error processing #{input_file}: #{e.message}"
+        raise Bundler::Thor::Error, "Error processing #{input_file}: #{e.message}"
       end
 
       def self.exit_on_failure?
